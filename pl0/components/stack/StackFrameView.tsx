@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Stack } from '../../core/model';
-import { UIStackFrame } from '../../core/uitransofmation';
+import React from 'react';
+import { UIStackFrame } from '../../core/uitransformation';
 import styles from '../../styles/stack.module.css';
 import { StackFrameValue } from './StackFrameValue';
 

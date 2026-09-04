@@ -1,8 +1,6 @@
 import type { NextPage } from 'next';
 import Head from 'next/head';
-import Image from 'next/image';
 import styles from '../styles/layout.module.css';
-import * as core from '../core/index';
 import React, { useEffect, useState } from 'react';
 import {
     DataModel,
@@ -10,13 +8,11 @@ import {
     Instruction,
     InstructionStepParameters,
     InstructionStepResult,
-    InstructionType,
 } from '../core/model';
-import { InitModel } from '../core/operations';
+import { InitModel, NextStep } from '../core/operations';
 import { Instructions } from '../components/instructions';
 import { PreprocessingError } from '../core/validator';
 import { Stack } from '../components/stack';
-import { Button } from 'react-bootstrap';
 import { Heap } from '../components/heap';
 import { Footer } from '../components/footer';
 import { ExplainInstruction } from '../core/explainer';
@@ -29,11 +25,19 @@ import {
     SplitExplanationMessageParts,
     StackToBeHighlighted,
 } from '../core/highlighting';
-import i18next from 'i18next';
+import { useTranslation } from 'react-i18next';
+
+interface HistorySnapshot {
+    model: DataModel;
+    inputTxt: string;
+    output: string;
+    warnings: string[];
+}
 
 const Home: NextPage = () => {
+    const { t, i18n } = useTranslation();
     const [model, setModel] = useState<DataModel | null>(null);
-    const [models, setModels] = useState<DataModel[]>([]);
+    const [history, setHistory] = useState<HistorySnapshot[]>([]);
 
     const [version, setVersion] = useState<number>(0);
     const [explainerVersion, setExplainerVersion] = useState<number>(0);
@@ -50,25 +54,17 @@ const Home: NextPage = () => {
         EmulationState.NOT_STARTED
     );
 
-    useEffect(() => {
-        if (!model) {
-            return;
-        }
-        let shouldUpdate: boolean = !instructions[model.pc]?.explanationParts;
-
-        explainNextInstruction();
-        if (shouldUpdate) {
-            setVersion(version + 1);
-        }
-    }, [model, version]);
+    const isPlayingRef = React.useRef<boolean>(false);
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
     useEffect(() => {
-        if (!model) {
+        if (!model || model.pc >= instructions.length) {
             return;
         }
 
         explainNextInstruction();
-    }, [model, version, inputTxt]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [model?.pc, inputTxt, i18n.language]);
 
     function instructionsLoaded(
         instructions: Instruction[],
@@ -77,34 +73,58 @@ const Home: NextPage = () => {
     ) {
         setValidationOK(validationOK);
         setValidationErrors(validationErrors);
-
         setInstructions(instructions);
-
         start();
     }
 
     function start() {
+        isPlayingRef.current = false;
+        setIsPlaying(false);
         const m = InitModel(1024, 250);
         setEmulationState(EmulationState.NOT_STARTED);
-
         resetInstructionsExplanations();
-
-        // empty models (todo better?)
-        models.splice(0, models.length);
-
-        models.push(JSON.parse(JSON.stringify(m)));
+        setHistory([]);
         setModel({ ...m });
-
+        setInputTxt('');
+        setOutputTxt('');
+        setWarnings([]);
         explainNextInstruction();
     }
-    function play() {
-        let result = nextStep();
 
-        while (result && !result.isEnd) {
-            inputTxt = result.inputNextStep;
-            result = nextStep();
+    function play() {
+        if (isPlayingRef.current) {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            return;
         }
+        if (!ableToContinue()) return;
+        isPlayingRef.current = true;
+        setIsPlaying(true);
+
+        let stepCount = 0;
+        const maxSteps = 10000;
+
+        function runStep() {
+            if (!isPlayingRef.current) return;
+            if (stepCount++ >= maxSteps) {
+                alert('Maximum execution steps limit reached.');
+                isPlayingRef.current = false;
+                setIsPlaying(false);
+                return;
+            }
+
+            const res = nextStep();
+            if (res && !res.isEnd && isPlayingRef.current) {
+                setTimeout(runStep, 40);
+            } else {
+                isPlayingRef.current = false;
+                setIsPlaying(false);
+            }
+        }
+
+        runStep();
     }
+
     function getNextStepParameters(): InstructionStepParameters | null {
         if (!model) {
             return null;
@@ -115,48 +135,70 @@ const Home: NextPage = () => {
             input: inputTxt,
         };
     }
-    function nextStep() {
-        models.push(JSON.parse(JSON.stringify(model)));
+
+    function nextStep(): InstructionStepResult | null {
+        if (!model) {
+            return null;
+        }
+
+        setHistory((prev) => [
+            ...prev,
+            {
+                model: JSON.parse(JSON.stringify(model)),
+                inputTxt: inputTxt,
+                output: output,
+                warnings: [...warnings],
+            },
+        ]);
+
         let result: InstructionStepResult | null = null;
 
         try {
-            if (!model) {
-                return;
-            }
-
             model.input = inputTxt;
             const pars: InstructionStepParameters | null = getNextStepParameters();
             if (!pars) {
-                return;
+                return null;
             }
 
-            result = core.Operations.NextStep(pars);
+            const stepResult = NextStep(pars);
+            result = stepResult;
 
-            if (result.isEnd) {
+            if (stepResult.isEnd) {
                 setEmulationState(EmulationState.FINISHED);
+                isPlayingRef.current = false;
+                setIsPlaying(false);
             } else {
                 setEmulationState(EmulationState.PAUSED);
             }
 
-            setInputTxt(result.inputNextStep);
-            setOutputTxt(result.output);
-            setWarnings([...warnings, ...result.warnings]);
+            setInputTxt(stepResult.inputNextStep);
+            setOutputTxt(stepResult.output);
+            setWarnings([...warnings, ...stepResult.warnings]);
 
             explainNextInstruction();
         } catch (e) {
             alert((e as Error).message);
             setEmulationState(EmulationState.ERROR);
+            isPlayingRef.current = false;
+            setIsPlaying(false);
         }
 
-        //setModel({ ...model });
-        setVersion(version + 1);
-
+        setVersion((v) => v + 1);
         return result;
     }
+
     function previous() {
-        setModel(models[models.length - 1]);
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        if (history.length === 0) return;
+        const lastSnapshot = history[history.length - 1];
+        setHistory((prev) => prev.slice(0, prev.length - 1));
+        setModel(lastSnapshot.model);
+        setInputTxt(lastSnapshot.inputTxt);
+        setOutputTxt(lastSnapshot.output);
+        setWarnings(lastSnapshot.warnings);
         setEmulationState(EmulationState.PAUSED);
-        models.pop();
+        setVersion((v) => v + 1);
     }
 
     function ableToContinue(): boolean {
@@ -169,8 +211,9 @@ const Home: NextPage = () => {
             emulationState === EmulationState.NOT_STARTED
         );
     }
+
     function explainNextInstruction() {
-        if (!ableToContinue() || !model || model.pc >= instructions.length) return;
+        if (!model || model.pc >= instructions.length) return;
 
         const pars: InstructionStepParameters | null = getNextStepParameters();
         if (!pars) {
@@ -184,26 +227,26 @@ const Home: NextPage = () => {
         );
         instructions[model.pc].explanationParts = parseParts;
 
-        setExplainerVersion(explainerVersion + 1);
+        setExplainerVersion((v) => v + 1);
     }
 
     function resetInstructionsExplanations() {
         for (const instruction of instructions) {
             instruction.explanationParts = [];
         }
-        setVersion(version + 1);
+        setVersion((v) => v + 1);
     }
 
     return (
         <main className={styles.layoutwrapper}>
             <Head>
-                <title>{i18next.t('ui:title')}</title>
+                <title>{t('ui:title')}</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
 
             <div className={styles.header}>
                 <ControlPanel
-                    models={models}
+                    models={history.map((h) => h.model)}
                     model={model}
                     nextStep={nextStep}
                     previous={previous}

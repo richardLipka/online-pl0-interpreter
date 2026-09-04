@@ -1,8 +1,4 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
-import { Wrapper } from '../general/Wrapper';
+import React from 'react';
 
 type InputProps = {
     inputTxt: string;
@@ -10,17 +6,16 @@ type InputProps = {
 };
 
 export function Input(props: InputProps) {
-    function handleChange(event: React.FormEvent<HTMLInputElement>) {
+    function handleChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
         props.setInputTXT(event.currentTarget.value);
     }
 
     return (
         <textarea
             style={{ width: '100%' }}
-            type="text"
             value={props.inputTxt}
             onChange={handleChange}
-            id={"input-textarea"}
+            id={'input-textarea'}
         />
     );
 }

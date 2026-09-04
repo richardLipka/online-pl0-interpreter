@@ -1,8 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import {
-    InstructionsHighligting,
-    InstructionsToBeHighlighted,
-} from '../../core/highlighting';
+import React from 'react';
+import { InstructionsHighligting } from '../../core/highlighting';
 import { Instruction, InstructionType } from '../../core/model';
 import { InstructionExplanation } from './InstructionExplanation';
 

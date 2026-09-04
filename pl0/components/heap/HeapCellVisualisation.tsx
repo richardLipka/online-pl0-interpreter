@@ -1,10 +1,6 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Heap, HeapBlock, HeapCellType, Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
+import React from 'react';
+import { HeapCellType } from '../../core/model';
 import styles from '../../styles/heap.module.css';
-import classNames from 'classnames';
-import { GetValueFromHeap } from '../../core/allocator';
 import { useTranslation } from 'react-i18next';
 
 type HeapCellVisualisationProps = {

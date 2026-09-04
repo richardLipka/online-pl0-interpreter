@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heap, Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
+import { Heap as HeapType } from '../../core/model';
 import { HeaderWrapper } from '../general/HeaderWrapper';
-import { Wrapper } from '../general/Wrapper';
 import { HeapVisualisation } from './HeapVisualisation';
 
 type HeapProps = {
-    heap?: Heap;
+    heap?: HeapType;
     heapToBeHighlighted: Map<number, string>;
 };
 
 export function Heap(props: HeapProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     if (!props.heap) {
         return null;
     }

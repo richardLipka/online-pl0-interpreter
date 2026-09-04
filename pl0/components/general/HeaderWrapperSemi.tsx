@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
+import React from 'react';
 import { primary } from '../../constants/Colors';
-import { Instruction } from '../../core/model';
-import { PreprocessingError } from '../../core/validator';
 
 type WrapperProps = {
-    children: JSX.Element | JSX.Element[];
+    children: React.ReactNode;
     header: string;
-    style?: any;
+    style?: React.CSSProperties;
 };
 
 export function HeaderWrapperSemi(props: WrapperProps) {

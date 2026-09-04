@@ -1,10 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Explanation, Placeholder } from '../../core/explainer';
-import {
-    ExplanationMessagePart,
-    SplitExplanationMessageParts,
-} from '../../core/highlighting';
-import { Instruction, InstructionType } from '../../core/model';
+import React from 'react';
+import { ExplanationMessagePart } from '../../core/highlighting';
 
 type InstructionExplanationProps = {
     explanationParts: ExplanationMessagePart[];

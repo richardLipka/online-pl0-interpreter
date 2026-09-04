@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Table } from 'react-bootstrap';
 import { Instruction } from '../../core/model';
 import { InstructionItemView } from './InstructionItemView';
@@ -12,7 +12,7 @@ type InstructionsTableProps = {
     instructionsToBeHighlighted: InstructionsHighligting | null;
 };
 export function InstructionsTable(props: InstructionsTableProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     return (
         <Table className={styles.instructionsTable}>
             <thead>

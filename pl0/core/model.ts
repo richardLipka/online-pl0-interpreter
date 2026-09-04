@@ -161,8 +161,11 @@ function GetValuesFromStack(
             throw new Error(i18next.t('core:modelStackNegativeError'));
         }
         retvals.push(stack.stackItems[index - i].value);
-        if (decrementCurrentFrame) {
-            stack.stackFrames[stack.stackFrames.length - 1].size--;
+        if (decrementCurrentFrame && stack.stackFrames.length > 0) {
+            stack.stackFrames[stack.stackFrames.length - 1].size = Math.max(
+                0,
+                stack.stackFrames[stack.stackFrames.length - 1].size - 1
+            );
         }
     }
     return retvals;
@@ -296,10 +299,14 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
 
     switch (op) {
         case InstructionType.LIT:
+            let litVal: number | string = parameter_str;
+            if (!Number.isNaN(Number(parameter_str)) && parameter_str.trim() !== '') {
+                litVal = Number(parameter_str);
+            }
             params.model.sp = PushOntoStack(
                 stack,
                 params.model.sp,
-                ConvertToStackItems(parameter_str)
+                ConvertToStackItems(litVal)
             );
             params.model.pc++;
             break;
@@ -719,7 +726,7 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(operands[1] < operands[0] ? 1 : 0)
+                ConvertToStackItems(Number(operands[1]) < Number(operands[0]) ? 1 : 0)
             );
             break;
         case OperationType.MORE_EQ_THAN:
@@ -728,7 +735,7 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(operands[1] >= operands[0] ? 1 : 0)
+                ConvertToStackItems(Number(operands[1]) >= Number(operands[0]) ? 1 : 0)
             );
             break;
         case OperationType.MORE_THAN:
@@ -737,7 +744,7 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(operands[1] > operands[0] ? 1 : 0)
+                ConvertToStackItems(Number(operands[1]) > Number(operands[0]) ? 1 : 0)
             );
             break;
         case OperationType.LESS_EQ_THAN:
@@ -746,7 +753,7 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(operands[1] <= operands[0] ? 1 : 0)
+                ConvertToStackItems(Number(operands[1]) <= Number(operands[0]) ? 1 : 0)
             );
             break;
         default:

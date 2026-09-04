@@ -1,4 +1,3 @@
-import { getPackedSettings } from 'http2';
 import type { Heap } from './model';
 import type { HeapBlock } from './model';
 
@@ -30,10 +29,10 @@ export function Allocate(heap: Heap, count: number): number {
             } else {
                 // Otherwise we split the block - one count large and the following
                 // count smaller and 2 more smaller for the block info
-                // worst case scenation, we will have empty block with size 0 taking up 2 cells
+                // worst case scenario, we will have empty block with size 0 taking up 2 cells
                 heap.values[blockAddress + count + 2] =
                     heap.values[blockAddress] - count - 2;
-                heap.values[blockAddress + heap.values[blockAddress] + 1] = 0;
+                heap.values[blockAddress + count + 3] = 0;
                 heap.values[blockAddress] = count;
                 heap.values[blockAddress + 1] = 1;
                 return blockAddress + 2;
@@ -41,7 +40,9 @@ export function Allocate(heap: Heap, count: number): number {
         } else {
             // if the block is not empty or large enough, we move onto another block
             // which is 2 memory info cells and block size more to the right
-            blockAddress += heap.values[blockAddress] + 2;
+            let bSize = heap.values[blockAddress] + 2;
+            if (bSize <= 0) break;
+            blockAddress += bSize;
         }
     }
 
@@ -58,6 +59,28 @@ export function Allocate(heap: Heap, count: number): number {
 export function Free(heap: Heap, address: number): number {
     if (address > heap.size - 1 || address < 2) {
         // Fail on out of bounds
+        return -1;
+    }
+
+    // Verify address starts at a valid block boundary
+    let curr = 0;
+    let validBlock = false;
+    while (curr < heap.size - 1) {
+        if (curr + 2 === address) {
+            validBlock = true;
+            break;
+        }
+        let bSize = heap.values[curr] + 2;
+        if (bSize <= 0) break;
+        curr += bSize;
+    }
+
+    if (!validBlock) {
+        return -1;
+    }
+
+    // Check if the block is already free (double-free prevention)
+    if (heap.values[address - 1] === 0) {
         return -1;
     }
 
@@ -86,8 +109,8 @@ export function Free(heap: Heap, address: number): number {
             // for the block info
             heap.values[address - 2] += heap.values[address + blockSize] + 2;
             // Then we zero the memory info of the block merged with the one freed
+            heap.values[address + blockSize] = 0;
             heap.values[address + blockSize + 1] = 0;
-            heap.values[address + blockSize + 2] = 0;
         }
     }
 
@@ -174,11 +197,21 @@ export function GetValueFromHeap(heap: Heap, address: number): number | null {
 export function PutValueOnHeap(heap: Heap, address: number, value: number): number {
     if (address < 0 || address > heap.size - 1) {
         return -1;
-    } else {
-        heap.values[address] = value;
-        return 0;
     }
-    // We dont care about unallocated memory with this approach
+
+    // Check if target address hits allocator metadata
+    let curr = 0;
+    while (curr < heap.size - 1) {
+        let bSize = heap.values[curr] + 2;
+        if (address === curr || address === curr + 1) {
+            return -2;
+        }
+        if (bSize <= 0) break;
+        curr += bSize;
+    }
+
+    heap.values[address] = value;
+    return 0;
 }
 
 /**
@@ -227,6 +260,9 @@ export function UpdateHeapBlocks(heap: Heap) {
     heap.heapBlocks = [];
     while (blockAddress < heap.size - 1) {
         let blockSize = heap.values[blockAddress] + 2;
+        if (blockSize <= 0) {
+            break;
+        }
         let dataSize = heap.values[blockAddress];
         let free = heap.values[blockAddress + 1] == 0;
         let dataAddress = blockAddress + 2;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Button, Modal } from 'react-bootstrap';
+import { Button, Modal } from 'react-bootstrap';
 import { Instruction } from '../../core/model';
 import { ParseAndValidate, PreprocessingError } from '../../core/validator';
 import { ShowToast } from '../../utils/alerts';
@@ -19,7 +19,7 @@ type InstructionsLoaderProps = {
 };
 
 export function InstructionsLoader(props: InstructionsLoaderProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [showModal, setShowModal] = useState(false);
 
     const handleClose = () => setShowModal(false);
@@ -80,30 +80,30 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
     }
 
     function onFileAdded(e: React.FormEvent<HTMLInputElement>) {
-        if (!e.currentTarget.files) return;
+        if (!e.currentTarget.files || e.currentTarget.files.length === 0) return;
 
-        var file = e.currentTarget.files[0];
-        var reader = new FileReader();
+        const file = e.currentTarget.files[0];
+        const isTextMime = !file.type || file.type.startsWith('text/') || file.type === 'application/octet-stream';
+        const isTextExt = /\.(pl0|pcode|asm|txt|code|dat)$/i.test(file.name) || !file.name.includes('.');
 
-        var textFile = /text.*/;
-
-        if (file.type.match(textFile)) {
-            reader.onload = async (e) => {
-                if (!e.target) return;
-
-                const text = e.target.result;
-                if (text && typeof text == 'string') {
+        if (isTextMime || isTextExt) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target?.result;
+                if (typeof text === 'string') {
                     setTextInstructions(text);
                     ShowToast(t('ui:inputFileLoaded'));
                 } else {
                     ShowToast(t('ui:inputFileError'), 'error');
                 }
             };
+            reader.onerror = () => {
+                ShowToast(t('ui:inputFileError'), 'error');
+            };
+            reader.readAsText(file);
         } else {
             ShowToast(t('ui:inputFileErrorNotText'), 'error');
         }
-
-        reader.readAsText(file);
     }
     function onSave() {
         if (instructions == null) {

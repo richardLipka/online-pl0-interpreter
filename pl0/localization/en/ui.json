@@ -1,5 +1,7 @@
 {
     "title": "PL/0",
+    "selectLanguage": "Select language",
+    "btnBack": "Step back",
     "bntBack": "Step back",
     "btnForward": "Step forward",
     "btnPlay": "Run",

@@ -1,8 +1,5 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Z_UNKNOWN } from 'zlib';
-import { Heap, HeapCellType, Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
+import React from 'react';
+import { Heap, HeapCellType } from '../../core/model';
 import { HeapCellVisualisation } from './HeapCellVisualisation';
 
 type HeapVisualisationProps = {

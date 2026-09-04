@@ -1,5 +1,7 @@
 {
     "title": "PL/0",
+    "selectLanguage": "Vyberte jazyk",
+    "btnBack": "Krok zpět",
     "bntBack": "Krok zpět",
     "btnForward": "Krok vpřed",
     "btnPlay": "Spustit",

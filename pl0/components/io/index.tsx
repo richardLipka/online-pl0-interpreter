@@ -1,14 +1,9 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
-import { HeaderWrapper } from '../general/HeaderWrapper';
 import { HeaderWrapperSemi } from '../general/HeaderWrapperSemi';
 import { Wrapper } from '../general/Wrapper';
 import { Input } from './Input';
 import { Output } from './Output';
-import { WarningsView } from './Warnings';
 
 type IOProps = {
     inputTxt: string;
@@ -18,7 +13,7 @@ type IOProps = {
 };
 
 export function IO(props: IOProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     return (
         <Wrapper>
             <div

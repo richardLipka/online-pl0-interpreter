@@ -1,8 +1,7 @@
-import { t } from 'i18next';
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Stack, StackItem } from '../../core/model';
-import { UIStackFrame } from '../../core/uitransofmation';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { StackItem } from '../../core/model';
+import { UIStackFrame } from '../../core/uitransformation';
 import styles from '../../styles/stack.module.css';
 
 type StackFrameValueProps = {
@@ -21,6 +20,7 @@ function addAlpha(color: string, opacity: number): string {
 }
 
 export function StackFrameValue(props: StackFrameValueProps) {
+    const { t } = useTranslation();
     const isSF = props.stackFrame.isStackFrame;
     const isSFHeader = isSF && props.orderInStackFrame < 3;
 

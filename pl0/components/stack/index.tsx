@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExplanationMessagePart } from '../../core/highlighting';
-import { Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
+import type { Stack as StackType } from '../../core/model';
+import { TransformStackFrames } from '../../core/uitransformation';
 import { HeaderWrapper } from '../general/HeaderWrapper';
-import { Wrapper } from '../general/Wrapper';
 import { StackFrameView } from './StackFrameView';
 import { StackSplitter } from './StackSplitter';
 
 type StackProps = {
-    stack?: Stack;
+    stack?: StackType;
     sp?: number;
     base?: number;
 
@@ -18,9 +15,9 @@ type StackProps = {
 };
 
 export function Stack(props: StackProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
-    if (!props.stack || !props.sp) {
+    if (!props.stack || props.sp === undefined || props.sp === null) {
         return null;
     }
 

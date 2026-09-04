@@ -62,10 +62,34 @@ export let instructionStringMap = new Map<InstructionType, string>([
     [InstructionType.OPF, 'OPF'],
 ]);
 
+function tokenizeLine(line: string): string[] {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+    const regex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+    const tokens: string[] = [];
+    let match;
+    while ((match = regex.exec(trimmed)) !== null) {
+        if (match[1] !== undefined) {
+            tokens.push(match[1]);
+        } else if (match[2] !== undefined) {
+            tokens.push(match[2]);
+        } else if (match[3] !== undefined) {
+            let tok = match[3];
+            if (tok.endsWith(',')) {
+                tok = tok.slice(0, -1);
+            }
+            if (tok.length > 0) {
+                tokens.push(tok);
+            }
+        }
+    }
+    return tokens;
+}
+
 export function ParseAndValidate(input: string): ValidationResult {
     let lines = input.split(/\r?\n/);
 
-    if (lines.length == 1 && lines[0] == '') {
+    if (lines.length == 1 && lines[0].trim() == '') {
         return {
             emptyInput: true,
             validationOK: false,
@@ -84,7 +108,12 @@ export function ParseAndValidate(input: string): ValidationResult {
     let line_counter = 0;
 
     for (let i = 0; i < lines.length; i++) {
-        let splitLine = lines[i].trim().split(/\s+/);
+        let trimmedLine = lines[i].trim();
+        if (trimmedLine.length === 0) {
+            continue;
+        }
+
+        let splitLine = tokenizeLine(trimmedLine);
 
         if (splitLine.length == 3) {
             splitLine.unshift((line_counter++).toString());
@@ -115,6 +144,15 @@ export function ParseAndValidate(input: string): ValidationResult {
             });
             continue;
         }
+        let op: string = splitLine[1];
+        if (!stringInstructionMap.has(op.toUpperCase())) {
+            parseOK = false;
+            parseErrors.push({
+                rowIndex: i,
+                error: i18next.t('core:validatorUnkInstruction'),
+            });
+            continue;
+        }
         let level = Number(splitLine[2]);
         if (Number.isNaN(level)) {
             parseOK = false;
@@ -127,21 +165,16 @@ export function ParseAndValidate(input: string): ValidationResult {
         let parameter_str = splitLine[3];
         let parameter = Number(parameter_str);
         if (Number.isNaN(parameter)) {
-            parseOK = false;
-            parseErrors.push({
-                rowIndex: i,
-                error: i18next.t('core:validatorParInteger'),
-            });
-            continue;
-        }
-        let op: string = splitLine[1];
-        if (!stringInstructionMap.has(op.toUpperCase())) {
-            parseOK = false;
-            parseErrors.push({
-                rowIndex: i,
-                error: i18next.t('core:validatorUnkInstruction'),
-            });
-            continue;
+            if (op.toUpperCase() === 'LIT') {
+                parameter = 0;
+            } else {
+                parseOK = false;
+                parseErrors.push({
+                    rowIndex: i,
+                    error: i18next.t('core:validatorParInteger'),
+                });
+                continue;
+            }
         }
 
         if (!parseOK) {
@@ -155,7 +188,7 @@ export function ParseAndValidate(input: string): ValidationResult {
             level: level,
             parameter: parameter,
             parameter_str: parameter_str,
-            explanation: null,
+            explanationParts: null,
         };
         instructions.push(instruction);
     }

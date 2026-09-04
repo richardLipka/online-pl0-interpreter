@@ -1,17 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Badge, Button, Modal, Table } from 'react-bootstrap';
-import { Instruction } from '../../core/model';
-import { ParseAndValidate, PreprocessingError } from '../../core/validator';
-import { ShowToast } from '../../utils/alerts';
-import { OKView } from '../general/OKView';
-import styles from '../../styles/instructions.module.css';
-import { ButtonStyle, IconButton } from '../general/IconButton';
-
-import { faEdit, faQuestion } from '@fortawesome/free-solid-svg-icons';
+import React, { useState } from 'react';
+import { Button, Modal, Table } from 'react-bootstrap';
+import { IconButton } from '../general/IconButton';
+import { faQuestion } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
 
 export function Help() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [showModal, setShowModal] = useState(false);
 
     const handleClose = () => setShowModal(false);

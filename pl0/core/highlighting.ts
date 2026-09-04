@@ -106,9 +106,11 @@ export function InstructionsToBeHighlighted(
     }
 
     for (const part of FilterParts(parts)) {
-        if (part.placeholder?.stack && part.color) {
-            for (const instructions of part.placeholder?.instructions) {
-                ih.rowColors.set(instructions, part.color);
+        if (part.placeholder && part.color) {
+            if (part.placeholder.instructions) {
+                for (const instructions of part.placeholder.instructions) {
+                    ih.rowColors.set(instructions, part.color);
+                }
             }
 
             if (part.placeholder.level) {
@@ -132,8 +134,8 @@ export function HeapToBeHighlighted(
     let colorMap = new Map<number, string>();
 
     for (const part of FilterParts(parts)) {
-        if (part.placeholder?.stack && part.color) {
-            for (const heap of part.placeholder?.heap) {
+        if (part.placeholder?.heap && part.color) {
+            for (const heap of part.placeholder.heap) {
                 colorMap.set(heap, part.color);
             }
         }

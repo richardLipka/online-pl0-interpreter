@@ -1,20 +1,14 @@
-import React, { useState } from 'react';
-import { Button } from 'react-bootstrap';
-import { dark, light, primary } from '../../constants/Colors';
+import React from 'react';
 import { DataModel, EmulationState } from '../../core/model';
-
 import {
     faStepBackward,
     faStepForward,
     faPlay,
     faRedo,
 } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ButtonStyle, IconButton } from '../general/IconButton';
 import Select, { SingleValue } from 'react-select';
-import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { faQuestion } from '@fortawesome/free-solid-svg-icons';
 import { Help } from '../help';
 
 const languageOptions = [
@@ -65,7 +59,7 @@ export function ControlPanel(props: ControlPanelProps) {
                 <IconButton
                     onClick={props.previous}
                     disabled={!props.models || !props.models.length}
-                    text={t('ui:bntBack')}
+                    text={t('ui:btnBack')}
                     icon={faStepBackward}
                     id={'back-button'}
                 />
@@ -107,19 +101,19 @@ export function ControlPanel(props: ControlPanelProps) {
                 >
                     <Select
                         options={languageOptions}
-                        placeholder={'Vyberte jazyk'}
-                        defaultValue={
-                            languageOptions.filter((o) => o.value == i18next.language)[0]
+                        placeholder={t('ui:selectLanguage')}
+                        value={
+                            languageOptions.find(
+                                (o) => o.value === (i18n.language?.startsWith('en') ? 'en' : 'cs')
+                            ) ?? languageOptions[0]
                         }
-                        // @ts-ignore
                         onChange={(
                             newValue: SingleValue<{
                                 value: string;
                                 label: string;
-                            }>,
-                            index: number
+                            }>
                         ) => {
-                            i18next.changeLanguage(newValue?.value ?? 'cs');
+                            i18n.changeLanguage(newValue?.value ?? 'cs');
                         }}
                     />
                 </div>

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { dark, light, primary } from '../../constants/Colors';
+import React from 'react';
+import { light, primary } from '../../constants/Colors';
 import { useTranslation } from 'react-i18next';
 
 export function Footer() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
     return (
         <div

@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
+const nextConfig = {
     reactStrictMode: true,
+    output: 'export',
     images: {
-        loader: 'imgix',
-        path: 'https://pl0.webhost.net-inout.com/',
+        unoptimized: true,
     },
 };
+
+module.exports = nextConfig;
+

@@ -1,21 +1,16 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Stack } from '../../core/model';
-import { TransformStackFrames } from '../../core/uitransofmation';
-import { Wrapper } from '../general/Wrapper';
+import React from 'react';
 
-type InputProps = {
+type OutputProps = {
     outputTxt: string;
 };
 
-export function Output(props: InputProps) {
+export function Output(props: OutputProps) {
     return (
         <textarea
             style={{ width: '100%', flexGrow: 1 }}
             value={props.outputTxt}
-            onChange={() => {}}
             readOnly={true}
-            id={"output-textarea"}
+            id={'output-textarea'}
         />
     );
 }

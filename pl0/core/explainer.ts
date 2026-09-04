@@ -1,4 +1,3 @@
-import { basename } from 'path/posix';
 import {
     Instruction,
     InstructionType,
@@ -88,24 +87,28 @@ function CheckSPInBounds(sp: number) {
 
 function FindBaseDummy(stack: Stack, base: number, level: number): number[] {
     let newBase = base;
-    let levels = [base];
+    let retvals = [newBase];
     while (level > 0) {
         newBase = Number(stack.stackItems[newBase].value);
         level--;
-        levels.push(newBase);
+
         if (newBase == 0 && level != 0) {
             return [-1];
         }
+        retvals.push(newBase);
     }
-
-    return levels;
+    return retvals;
 }
 
 // ------------------------------------------- STACK UTILITY FUNCTIONS
 
-// ------------------------------------------- EXPLAINER
+// ------------------------------------------- INSTRUCTION FUNCTIONS
 
 export function ExplainInstruction(params: InstructionStepParameters): Explanation {
+    if (!params.instructions || params.model.pc >= params.instructions.length) {
+        return { message: '', placeholders: [] };
+    }
+
     let instruction = params.instructions[params.model.pc];
     let op = instruction.instruction;
     let level = instruction.level;
@@ -119,22 +122,44 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
         placeholders: [],
     };
 
-    switch (op) {
-        case InstructionType.LIT:
-            explanation.message = i18next.t('core:explainerLIT');
-            explanation.placeholders.push({
-                placeholder: '1',
-                value: parameter,
-                heap: [],
-                stack: [],
-                instructions: [],
-                level: false,
-                parameter: true,
-                output: false,
-                input: false,
-                highlightType: HighlightType.BOLD,
-            });
-            break;
+    const sp = params.model.sp;
+    if (
+        (op === InstructionType.JMC ||
+            op === InstructionType.STO ||
+            op === InstructionType.WRI ||
+            op === InstructionType.NEW ||
+            op === InstructionType.DEL ||
+            op === InstructionType.LDA ||
+            op === InstructionType.STA ||
+            op === InstructionType.PLD ||
+            op === InstructionType.PST ||
+            op === InstructionType.ITR ||
+            op === InstructionType.RTI) &&
+        sp < 0
+    ) {
+        return {
+            message: i18next.t('core:modelStackNegativeError'),
+            placeholders: [],
+        };
+    }
+
+    try {
+        switch (op) {
+            case InstructionType.LIT:
+                explanation.message = i18next.t('core:explainerLIT');
+                explanation.placeholders.push({
+                    placeholder: '1',
+                    value: instruction.parameter_str || parameter,
+                    heap: [],
+                    stack: [],
+                    instructions: [],
+                    level: false,
+                    parameter: true,
+                    output: false,
+                    input: false,
+                    highlightType: HighlightType.BOLD,
+                });
+                break;
         case InstructionType.OPR:
             explanation = ExplainOPR(stack, parameter, params.model.sp);
             break;
@@ -871,7 +896,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
 
     if (params.model.pc + 1 >= params.instructions.length) {
         if (op == InstructionType.JMC) {
-            if (stack.stackItems[params.model.sp].value != 0) {
+            if (params.model.sp >= 0 && stack.stackItems[params.model.sp]?.value != 0) {
                 explanation.message = i18next.t('core:explainerEndNoJump');
             }
         } else if (
@@ -887,6 +912,12 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
     }
 
     return explanation;
+    } catch (e) {
+        return {
+            message: (e as Error).message || '',
+            placeholders: [],
+        };
+    }
 }
 
 function ExplainOPR(stack: Stack, operation: number, sp: number): Explanation {
@@ -1049,7 +1080,6 @@ function ExplainOPR(stack: Stack, operation: number, sp: number): Explanation {
                 input: false,
                 highlightType: HighlightType.BOLD,
             });
-            break;
             break;
         case OperationType.MOD:
             explanation.message = i18next.t('core:explainerOPR6');

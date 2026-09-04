@@ -1,10 +1,7 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import { Instruction } from '../../core/model';
-import { PreprocessingError } from '../../core/validator';
+import React from 'react';
 
 type WrapperProps = {
-    children: JSX.Element | JSX.Element[];
+    children: React.ReactNode;
 };
 
 export function Wrapper(props: WrapperProps) {
