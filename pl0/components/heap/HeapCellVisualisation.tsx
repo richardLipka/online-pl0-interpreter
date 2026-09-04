@@ -8,22 +8,18 @@ type HeapCellVisualisationProps = {
     value: number;
     type: HeapCellType;
     heapToBeHighlighted: Map<number, string>;
+    metaRole?: 'size' | 'status' | 'prev';
+    blockAddress?: number;
+    blockFree?: boolean;
 };
 
 export function HeapCellVisualisation(props: HeapCellVisualisationProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
     const index = props.index;
     const highlightedColor: string | null = props.heapToBeHighlighted.has(index)
         ? props.heapToBeHighlighted.get(index) ?? null
         : null;
-
-    function isAllocated() {
-        return (
-            props.type === HeapCellType.ALLOCATED_DATA ||
-            props.type === HeapCellType.ALLOCATED_META
-        );
-    }
 
     function getCellStyle() {
         switch (props.type) {
@@ -35,9 +31,12 @@ export function HeapCellVisualisation(props: HeapCellVisualisationProps) {
                 return styles.heapCellFullMeta;
             case HeapCellType.ALLOCATED_DATA:
                 return styles.heapCellFull;
+            default:
+                return styles.heapCellEmpty;
         }
     }
-    function getCellTypeName() {
+
+    function getCellTypeName(): string {
         switch (props.type) {
             case HeapCellType.NOT_ALLOCATED:
                 return t('ui:notAllocated');
@@ -47,10 +46,23 @@ export function HeapCellVisualisation(props: HeapCellVisualisationProps) {
                 return t('ui:allocatedMeta');
             case HeapCellType.ALLOCATED_DATA:
                 return t('ui:allocated');
+            default:
+                return t('ui:notAllocated');
         }
     }
 
-    function showValue() {
+    function getMetaRoleLabel(): string | null {
+        if (props.metaRole === 'size') {
+            return t('ui:metaSize');
+        } else if (props.metaRole === 'status') {
+            return t('ui:metaStatus');
+        } else if (props.metaRole === 'prev') {
+            return t('ui:metaPrev');
+        }
+        return null;
+    }
+
+    function showValue(): boolean {
         return (
             props.type === HeapCellType.ALLOCATED_DATA ||
             props.type === HeapCellType.ALLOCATED_META ||
@@ -58,30 +70,57 @@ export function HeapCellVisualisation(props: HeapCellVisualisationProps) {
         );
     }
 
+    const metaLabel = getMetaRoleLabel();
+    const cellTypeName = getCellTypeName();
+
     return (
         <div
-            key={index}
-            className={`${styles.heapCell} ${getCellStyle()}`}
+            className={`${styles.heapCell} ${getCellStyle()} ${
+                highlightedColor ? styles.heapCellHighlighted : ''
+            }`}
             style={
                 highlightedColor
                     ? {
                           backgroundColor: highlightedColor,
-                          color: 'black',
+                          color: '#000000',
                       }
                     : {}
             }
-            title={
-                t('ui:heapCellIndex') +
-                ': ' +
-                index.toString() +
-                '\n' +
-                getCellTypeName() +
-                (showValue() == true
-                    ? '\n' + t('ui:heapCellValue') + ':' + props.value
-                    : '')
-            }
+            title={`${t('ui:heapCellIndex')}: ${index}\n${cellTypeName}${
+                metaLabel ? ` (${metaLabel})` : ''
+            }${showValue() ? `\n${t('ui:heapCellValue')}: ${props.value}` : ''}`}
         >
-            {showValue() && props.value}
+            <span className={styles.cellAddressBadge}>#{index}</span>
+            <span className={styles.cellValue}>{showValue() ? props.value : ''}</span>
+
+            <div className={styles.cellTooltip}>
+                <div className={styles.tooltipRow}>
+                    <span className={styles.tooltipLabel}>{t('ui:heapCellAddress')}:</span>
+                    <span className={styles.tooltipVal}>#{index}</span>
+                </div>
+                <div className={styles.tooltipRow}>
+                    <span className={styles.tooltipLabel}>{t('ui:heapCellType')}:</span>
+                    <span>{cellTypeName}</span>
+                </div>
+                {metaLabel && (
+                    <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>{t('ui:heapCellRole')}:</span>
+                        <span style={{ color: '#fbbf24' }}>{metaLabel}</span>
+                    </div>
+                )}
+                {props.blockAddress !== undefined && (
+                    <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>{t('ui:heapCellBlock')}:</span>
+                        <span className={styles.tooltipVal}>#{props.blockAddress}</span>
+                    </div>
+                )}
+                {showValue() && (
+                    <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>{t('ui:heapCellValue')}:</span>
+                        <span className={styles.tooltipVal}>{props.value}</span>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

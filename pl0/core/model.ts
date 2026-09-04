@@ -3,6 +3,7 @@ import { ExplanationMessagePart } from './highlighting';
 import {
     Allocate,
     Free,
+    GetHeapCellRole,
     GetValueFromHeap,
     PutValueOnHeap,
     UpdateHeapBlocks,
@@ -38,9 +39,15 @@ export interface StackFrame {
     size: number;
 }
 
+export enum AllocatorType {
+    SINGLE_LINKED = 0,
+    DOUBLY_LINKED = 1,
+}
+
 export interface Heap {
     size: number;
     values: number[];
+    allocatorType?: AllocatorType;
 
     heapBlocks: HeapBlock[];
 }
@@ -185,7 +192,7 @@ function GetValueFromStack(stack: Stack, index: number) {
     }
 }
 
-function PutOntoStack(stack: Stack, index: number, value: number) {
+function PutOntoStack(stack: Stack, index: number, value: number | string) {
     if (index >= stack.stackItems.length) {
         while (stack.stackItems.length - 1 != index) {
             stack.stackItems.push({ value: 0 });
@@ -260,6 +267,9 @@ function CheckSPInBounds(sp: number) {
 function FindBase(stack: Stack, base: number, level: number): number {
     let newBase = base;
     while (level > 0) {
+        if (newBase < 0 || newBase >= stack.stackItems.length) {
+            throw new Error(i18next.t('core:modelBaseSearchError') + level + ')');
+        }
         newBase = Number(stack.stackItems[newBase].value);
         level--;
 
@@ -275,7 +285,7 @@ function FindBase(stack: Stack, base: number, level: number): number {
 // ------------------------------------------- INSTRUCTION FUNCTIONS
 
 export function DoStep(params: InstructionStepParameters): InstructionStepResult {
-    if (params.model.pc >= params.instructions.length) {
+    if (params.model.pc < 0 || params.model.pc >= params.instructions.length) {
         throw new Error(i18next.t('core:modelNonExistentInstructionError'));
     }
 
@@ -319,7 +329,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.pc++;
             break;
         case InstructionType.JMP:
-            if (parameter >= params.instructions.length) {
+            if (parameter < 0 || parameter >= params.instructions.length) {
                 throw new Error(
                     i18next.t('core:modelInstructionOutOfBounds1') +
                     parameter +
@@ -332,7 +342,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var operands = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
             if (operands[0] == 0) {
-                if (parameter >= params.instructions.length) {
+                if (parameter < 0 || parameter >= params.instructions.length) {
                     throw new Error(
                         i18next.t('core:modelInstructionOutOfBounds1') +
                         parameter +
@@ -365,7 +375,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 false
             );
 
-            if (parameter >= params.instructions.length) {
+            if (parameter < 0 || parameter >= params.instructions.length) {
                 throw new Error(
                     i18next.t('core:modelInstructionOutOfBounds1') +
                     parameter +
@@ -410,18 +420,28 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var base = FindBase(stack, params.model.base, level);
             var address = base + parameter;
             var res = GetValuesFromStack(stack, params.model.sp, 1);
-            PutOntoStack(stack, address, Number(res[0]));
+            let stoVal = res[0];
+            if (typeof stoVal === 'string' && !Number.isNaN(Number(stoVal)) && stoVal.trim() !== '') {
+                stoVal = Number(stoVal);
+            }
+            PutOntoStack(stack, address, stoVal);
             params.model.sp--;
             params.model.pc++;
             break;
         case InstructionType.WRI:
             var code = GetValuesFromStack(stack, params.model.sp, 1);
+            let numCode: number;
+            if (typeof code[0] === 'string' && code[0].length === 1 && Number.isNaN(Number(code[0]))) {
+                numCode = code[0].charCodeAt(0);
+            } else {
+                numCode = Number(code[0]);
+            }
 
-            if (Number(code[0]) < 0 || Number(code[0]) > 255) {
+            if (Number.isNaN(numCode) || numCode < 0 || numCode > 255) {
                 throw new Error(i18next.t('core:modelReadInvalidInput'));
             }
 
-            params.model.output += String.fromCharCode(Number(code[0]));
+            params.model.output += String.fromCharCode(numCode);
 
             if (params.model.output.includes("\\n")) {
                 params.model.output = params.model.output.replace("\\n", "\n");
@@ -477,16 +497,27 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.LDA:
             var addr = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
-            var val = GetValueFromHeap(heap, Number(addr[0]));
-            if (val === null) {
+            var targetAddr = Number(addr[0]);
+            var ldaCellRole = GetHeapCellRole(heap, targetAddr);
+            if (ldaCellRole === 'outOfBounds') {
                 throw new Error(
                     i18next.t('core:modelHeapAccessUndefined1') +
-                    addr[0] +
+                    targetAddr +
                     i18next.t('core:modelHeapAccessUndefined2') +
                     heap.size
                 );
-            } else if (Number.isNaN(val)) {
-                throw new Error(i18next.t('core:modelHeapAccessUnallocated') + addr[0]);
+            }
+            var val = GetValueFromHeap(heap, targetAddr) ?? 0;
+            if (ldaCellRole === 'meta') {
+                const msg = String(i18next.t('core:modelHeapWarnReadMeta') || 'Warning: Read from block metadata at address %1');
+                warnings.push(
+                    msg.replace('%1', targetAddr.toString())
+                );
+            } else if (ldaCellRole === 'unallocated') {
+                const msg = String(i18next.t('core:modelHeapWarnReadUnallocated') || 'Warning: Read from unallocated heap memory at address %1');
+                warnings.push(
+                    msg.replace('%1', targetAddr.toString())
+                );
             }
             params.model.sp = PushOntoStack(
                 stack,
@@ -498,16 +529,30 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.STA:
             var addr = GetValuesFromStack(stack, params.model.sp, 2);
             params.model.sp -= 2;
-            var r = PutValueOnHeap(heap, Number(addr[1]), Number(addr[0]));
-            if (r == -1) {
+            var targetAddr = Number(addr[1]);
+            var valueToStore = Number(addr[0]);
+            var staCellRole = GetHeapCellRole(heap, targetAddr);
+            if (staCellRole === 'outOfBounds') {
                 throw new Error(
                     i18next.t('core:modelHeapAccessUndefined1') +
-                    addr[1] +
+                    targetAddr +
                     i18next.t('core:modelHeapAccessUndefined2') +
                     heap.size
                 );
-            } else if (r == -2) {
-                throw new Error(i18next.t('core:modelHeapAccessUnallocated') + addr[0]);
+            }
+            PutValueOnHeap(heap, targetAddr, valueToStore);
+            if (staCellRole === 'meta') {
+                const msg = String(i18next.t('core:modelHeapWarnWriteMeta') || 'Warning: Write into block metadata at address %1 (value %2, overwriting permitted)');
+                warnings.push(
+                    msg.replace('%1', targetAddr.toString())
+                        .replace('%2', valueToStore.toString())
+                );
+            } else if (staCellRole === 'unallocated') {
+                const msg = String(i18next.t('core:modelHeapWarnWriteUnallocated') || 'Warning: Write into unallocated heap memory at address %1 (value %2)');
+                warnings.push(
+                    msg.replace('%1', targetAddr.toString())
+                        .replace('%2', valueToStore.toString())
+                );
             }
             params.model.pc++;
             break;
@@ -526,7 +571,11 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var values = GetValuesFromStack(stack, params.model.sp, 3);
             params.model.sp -= 3;
             var base = FindBase(stack, params.model.base, Number(values[1]));
-            PutOntoStack(stack, base + Number(values[0]), Number(values[2]));
+            let pstVal = values[2];
+            if (typeof pstVal === 'string' && !Number.isNaN(Number(pstVal)) && pstVal.trim() !== '') {
+                pstVal = Number(pstVal);
+            }
+            PutOntoStack(stack, base + Number(values[0]), pstVal);
             params.model.pc++;
             break;
         case InstructionType.OPF:
@@ -691,6 +740,9 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
         case OperationType.MOD:
             operands = GetValuesFromStack(stack, sp, 2);
             sp -= 2;
+            if (Number(operands[0]) == 0) {
+                throw new Error(i18next.t('core:modelDivideByZero'));
+            }
             sp = PushOntoStack(
                 stack,
                 sp,
@@ -700,7 +752,7 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
         case OperationType.IS_ODD:
             operands = GetValuesFromStack(stack, sp, 1);
             sp -= 1;
-            sp = PushOntoStack(stack, sp, ConvertToStackItems(Number(operands[0]) % 2));
+            sp = PushOntoStack(stack, sp, ConvertToStackItems(Math.abs(Number(operands[0])) % 2));
             break;
         case OperationType.EQ:
             operands = GetValuesFromStack(stack, sp, 2);
@@ -942,6 +994,10 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             mantissa_1 = Number(operands[2]);
             exponent_1 = Number(operands[3]);
 
+            if (mantissa_2 == 0) {
+                throw new Error(i18next.t('core:modelDivideByZero'));
+            }
+
             /* Align exponents */
             exponent_diff = Math.abs(exponent_1 - exponent_2);
             if (exponent_1 > exponent_2) {
@@ -971,7 +1027,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             exponent = Number(operands[1]);
 
             /* Check if mantissa is odd */
-            binary_result = mantissa % 2;
+            binary_result = Math.abs(mantissa) % 2;
 
             sp = PushOntoStack(
                 stack,
@@ -990,8 +1046,16 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             mantissa_1 = Number(operands[2]);
             exponent_1 = Number(operands[3]);
 
+            /* Align exponents */
+            exponent_diff = Math.abs(exponent_1 - exponent_2);
+            if (exponent_1 > exponent_2) {
+                mantissa_1 *= Math.pow(10, exponent_diff);
+            } else {
+                mantissa_2 *= Math.pow(10, exponent_diff);
+            }
+
             /* Compare */
-            binary_result = mantissa_1 == mantissa_2 && exponent_1 == exponent_2 ? 1 : 0;
+            binary_result = (mantissa_1 === 0 && mantissa_2 === 0) || (mantissa_1 === mantissa_2) ? 1 : 0;
 
             sp = PushOntoStack(
                 stack,
@@ -1009,8 +1073,16 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             mantissa_1 = Number(operands[2]);
             exponent_1 = Number(operands[3]);
 
+            /* Align exponents */
+            exponent_diff = Math.abs(exponent_1 - exponent_2);
+            if (exponent_1 > exponent_2) {
+                mantissa_1 *= Math.pow(10, exponent_diff);
+            } else {
+                mantissa_2 *= Math.pow(10, exponent_diff);
+            }
+
             /* Compare */
-            binary_result = mantissa_1 != mantissa_2 || exponent_1 != exponent_2 ? 1 : 0;
+            binary_result = (mantissa_1 === 0 && mantissa_2 === 0) || (mantissa_1 === mantissa_2) ? 0 : 1;
 
             sp = PushOntoStack(
                 stack,

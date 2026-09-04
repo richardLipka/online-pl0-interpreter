@@ -14,11 +14,12 @@ function ExplanationPart({
     isNext: boolean;
 }): JSX.Element | null {
     if (part.placeholder) {
+        const replacement = String(part.placeholder.value ?? '');
         return (
             <span style={isNext ? { backgroundColor: part.color ?? 'white' } : {}}>
                 {part.content.replace(
                     part.placeholder.placeholder,
-                    part.placeholder.value.toString()
+                    replacement
                 )}
             </span>
         );

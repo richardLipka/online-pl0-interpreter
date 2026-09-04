@@ -117,6 +117,11 @@ export function ParseAndValidate(input: string): ValidationResult {
 
         if (splitLine.length == 3) {
             splitLine.unshift((line_counter++).toString());
+        } else if (splitLine.length >= 4) {
+            let explicitIdx = Number(splitLine[0]);
+            if (!Number.isNaN(explicitIdx)) {
+                line_counter = Math.max(line_counter, explicitIdx + 1);
+            }
         }
 
         if (splitLine.length < 3) {

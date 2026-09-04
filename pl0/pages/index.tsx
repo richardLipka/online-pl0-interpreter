@@ -3,6 +3,7 @@ import Head from 'next/head';
 import styles from '../styles/layout.module.css';
 import React, { useEffect, useState } from 'react';
 import {
+    AllocatorType,
     DataModel,
     EmulationState,
     Instruction,
@@ -66,6 +67,10 @@ const Home: NextPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model?.pc, inputTxt, i18n.language]);
 
+    const [allocatorType, setAllocatorType] = useState<AllocatorType>(
+        AllocatorType.SINGLE_LINKED
+    );
+
     function instructionsLoaded(
         instructions: Instruction[],
         validationOK: boolean,
@@ -77,10 +82,11 @@ const Home: NextPage = () => {
         start();
     }
 
-    function start() {
+    function start(overrideAllocator?: AllocatorType) {
         isPlayingRef.current = false;
         setIsPlaying(false);
-        const m = InitModel(1024, 250);
+        const currentAllocator = overrideAllocator ?? allocatorType;
+        const m = InitModel(1024, 250, currentAllocator);
         setEmulationState(EmulationState.NOT_STARTED);
         resetInstructionsExplanations();
         setHistory([]);
@@ -89,6 +95,11 @@ const Home: NextPage = () => {
         setOutputTxt('');
         setWarnings([]);
         explainNextInstruction();
+    }
+
+    function handleAllocatorChange(newType: AllocatorType) {
+        setAllocatorType(newType);
+        start(newType);
     }
 
     function play() {
@@ -107,7 +118,7 @@ const Home: NextPage = () => {
         function runStep() {
             if (!isPlayingRef.current) return;
             if (stepCount++ >= maxSteps) {
-                alert('Maximum execution steps limit reached.');
+                alert(t('ui:maxStepsReached'));
                 isPlayingRef.current = false;
                 setIsPlaying(false);
                 return;
@@ -259,8 +270,8 @@ const Home: NextPage = () => {
             <div className={styles.instructions}>
                 <Instructions
                     instructions={instructions}
-                    validationErrors={[]}
-                    validationOK={true}
+                    validationErrors={validationErrors}
+                    validationOK={validationOK}
                     instructionsLoaded={instructionsLoaded}
                     pc={model?.pc ?? null}
                     instructionsToBeHighlighted={
@@ -299,6 +310,8 @@ const Home: NextPage = () => {
                                           instructions[model?.pc ?? 0]?.explanationParts
                                       )
                             }
+                            allocatorType={allocatorType}
+                            onAllocatorChange={handleAllocatorChange}
                         />
                     </div>
                     <div className={styles.io}>

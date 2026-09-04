@@ -1,6 +1,8 @@
 import React from 'react';
-import { Heap, HeapCellType } from '../../core/model';
+import { useTranslation } from 'react-i18next';
+import { Heap, HeapBlock, HeapCellType } from '../../core/model';
 import { HeapCellVisualisation } from './HeapCellVisualisation';
+import styles from '../../styles/heap.module.css';
 
 type HeapVisualisationProps = {
     heap: Heap;
@@ -8,54 +10,125 @@ type HeapVisualisationProps = {
 };
 
 export function HeapVisualisation(props: HeapVisualisationProps) {
-    function getCellType(index: number): HeapCellType {
-        if (!props.heap.heapBlocks || props.heap.heapBlocks.length === 0) {
-            return HeapCellType.UNKNOWN;
-        }
+    const { t } = useTranslation();
 
-        for (const block of props.heap.heapBlocks) {
-            const first = block.blockAddress;
-            const last = block.blockAddress + block.blockSize - 1;
+    const blocks: HeapBlock[] = props.heap.heapBlocks ?? [];
 
-            const firstData = block.dataAddress;
-            const lastData = block.dataAddress + block.dataSize - 1;
-
-            if (index >= first && index <= last) {
-                if (index >= firstData && index <= lastData) {
-                    // in data part
-                    return block.free
-                        ? HeapCellType.NOT_ALLOCATED
-                        : HeapCellType.ALLOCATED_DATA;
-                } else {
-                    // in block metadata
-                    return block.free
-                        ? HeapCellType.NOT_ALLOCATED_META
-                        : HeapCellType.ALLOCATED_META;
-                }
-            }
-        }
-
-        return HeapCellType.UNKNOWN;
-    }
+    let coveredUpTo = 0;
 
     return (
-        <div
-            style={{
-                maxHeight: '100%',
-                display: 'flex',
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-            }}
-        >
-            {[...Array(props.heap.size)].map((e, index) => (
-                <HeapCellVisualisation
-                    heapToBeHighlighted={props.heapToBeHighlighted}
-                    index={index}
-                    key={index}
-                    type={getCellType(index)}
-                    value={props.heap.values[index]}
-                />
-            ))}
+        <div className={styles.blocksContainer}>
+            {blocks.map((block, blockIdx) => {
+                const blockStart = block.blockAddress;
+                const blockEnd = block.blockAddress + block.blockSize - 1;
+                coveredUpTo = Math.max(coveredUpTo, blockEnd + 1);
+
+                const cellIndices: number[] = [];
+                for (let i = blockStart; i <= blockEnd && i < props.heap.size; i++) {
+                    cellIndices.push(i);
+                }
+
+                return (
+                    <div
+                        key={blockIdx}
+                        className={`${styles.blockCard} ${
+                            block.free ? styles.blockCardFree : styles.blockCardAllocated
+                        }`}
+                    >
+                        <div className={styles.blockHeader}>
+                            <span
+                                className={`${styles.blockBadge} ${
+                                    block.free
+                                        ? styles.blockBadgeFree
+                                        : styles.blockBadgeAllocated
+                                }`}
+                            >
+                                {block.free
+                                    ? t('ui:blockHeaderFree')
+                                    : t('ui:blockHeaderAllocated')}
+                            </span>
+                            <span
+                                className={
+                                    block.free
+                                        ? styles.blockHeaderFree
+                                        : styles.blockHeaderAllocated
+                                }
+                            >
+                                @{blockStart}..@{blockEnd} (
+                                {t('ui:blockDataCells').replace(
+                                    '%1',
+                                    block.dataSize.toString()
+                                )}
+                                )
+                            </span>
+                        </div>
+                        <div className={styles.cellsGrid}>
+                            {cellIndices.map((index) => {
+                                const isMeta = block.allocatorInfoIndices.includes(index);
+                                let type: HeapCellType;
+                                let metaRole: 'size' | 'status' | 'prev' | undefined;
+
+                                if (isMeta) {
+                                    type = block.free
+                                        ? HeapCellType.NOT_ALLOCATED_META
+                                        : HeapCellType.ALLOCATED_META;
+                                    if (index === block.blockAddress) {
+                                        metaRole = 'size';
+                                    } else if (index === block.blockAddress + 1) {
+                                        metaRole = 'status';
+                                    } else if (index === block.blockAddress + 2) {
+                                        metaRole = 'prev';
+                                    }
+                                } else {
+                                    type = block.free
+                                        ? HeapCellType.NOT_ALLOCATED
+                                        : HeapCellType.ALLOCATED_DATA;
+                                }
+
+                                return (
+                                    <HeapCellVisualisation
+                                        key={index}
+                                        index={index}
+                                        value={props.heap.values[index]}
+                                        type={type}
+                                        heapToBeHighlighted={props.heapToBeHighlighted}
+                                        metaRole={metaRole}
+                                        blockAddress={block.blockAddress}
+                                        blockFree={block.free}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })}
+
+            {coveredUpTo < props.heap.size && (
+                <div className={`${styles.blockCard} ${styles.blockCardFree}`}>
+                    <div className={styles.blockHeader}>
+                        <span className={`${styles.blockBadge} ${styles.blockBadgeFree}`}>
+                            {t('ui:notAllocated')}
+                        </span>
+                        <span className={styles.blockHeaderFree}>
+                            @{coveredUpTo}..@{props.heap.size - 1}
+                        </span>
+                    </div>
+                    <div className={styles.cellsGrid}>
+                        {Array.from(
+                            { length: props.heap.size - coveredUpTo },
+                            (_, i) => coveredUpTo + i
+                        ).map((index) => (
+                            <HeapCellVisualisation
+                                key={index}
+                                index={index}
+                                value={props.heap.values[index]}
+                                type={HeapCellType.NOT_ALLOCATED}
+                                heapToBeHighlighted={props.heapToBeHighlighted}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

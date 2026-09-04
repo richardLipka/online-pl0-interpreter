@@ -89,6 +89,9 @@ function FindBaseDummy(stack: Stack, base: number, level: number): number[] {
     let newBase = base;
     let retvals = [newBase];
     while (level > 0) {
+        if (newBase < 0 || newBase >= stack.stackItems.length) {
+            return [-1];
+        }
         newBase = Number(stack.stackItems[newBase].value);
         level--;
 
@@ -501,15 +504,20 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
                 highlightType: HighlightType.BOLD,
             });
 
-            if (
-                Number(stack.stackItems[params.model.sp].value) < 0 ||
-                Number(stack.stackItems[params.model.sp].value) > 255
-            ) {
+            let wriVal = stack.stackItems[params.model.sp].value;
+            let wriCode: number;
+            if (typeof wriVal === 'string' && wriVal.length === 1 && Number.isNaN(Number(wriVal))) {
+                wriCode = wriVal.charCodeAt(0);
+            } else {
+                wriCode = Number(wriVal);
+            }
+
+            if (Number.isNaN(wriCode) || wriCode < 0 || wriCode > 255) {
                 explanation.message = i18next.t('core:explainerWRIAsciiErr');
             } else {
                 explanation.message =
                     i18next.t('core:explainerWRI') +
-                    String.fromCharCode(Number(stack.stackItems[params.model.sp].value));
+                    String.fromCharCode(wriCode);
             }
             break;
         case InstructionType.REA:
@@ -892,23 +900,6 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             break;
         default:
             throw new Error(i18next.t('core:modelNonExistentInstructionError'));
-    }
-
-    if (params.model.pc + 1 >= params.instructions.length) {
-        if (op == InstructionType.JMC) {
-            if (params.model.sp >= 0 && stack.stackItems[params.model.sp]?.value != 0) {
-                explanation.message = i18next.t('core:explainerEndNoJump');
-            }
-        } else if (
-            op != InstructionType.CAL &&
-            op != InstructionType.JMP &&
-            op != InstructionType.RET
-        ) {
-            explanation = {
-                placeholders: [],
-                message: i18next.t('core:explainerEndNoMoreInstructions'),
-            };
-        }
     }
 
     return explanation;
@@ -1612,7 +1603,6 @@ function ExplainOPF(stack: Stack, operation: number, sp: number): Explanation {
                 input: false,
                 highlightType: HighlightType.BACKGROUND,
             });
-            break;
             break;
         case OperationType.MOD:
             explanation.message = i18next.t('core:explainerOPF6');

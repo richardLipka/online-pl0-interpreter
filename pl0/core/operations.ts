@@ -3,14 +3,27 @@ import {
     InstructionStepParameters,
     InstructionStepResult,
     DoStep,
+    AllocatorType,
 } from './model';
 
-export function InitModel(stackMaxSize: number, heapSize: number): DataModel {
+export function InitModel(
+    stackMaxSize: number,
+    heapSize: number,
+    allocatorType: AllocatorType = AllocatorType.SINGLE_LINKED
+): DataModel {
     let values: number[] = [];
     for (let i = 0; i < heapSize; i++) {
         values.push(0);
     }
-    values[0] = heapSize - 2;
+
+    const isDoubly = allocatorType === AllocatorType.DOUBLY_LINKED;
+    const metaSize = isDoubly ? 3 : 2;
+
+    values[0] = heapSize - metaSize;
+    values[1] = 0; // free
+    if (isDoubly) {
+        values[2] = -1; // prev_address = none
+    }
 
     const m: DataModel = {
         pc: 0,
@@ -29,13 +42,14 @@ export function InitModel(stackMaxSize: number, heapSize: number): DataModel {
         heap: {
             size: heapSize,
             values: values,
+            allocatorType: allocatorType,
             heapBlocks: [
                 {
                     blockAddress: 0,
                     blockSize: heapSize,
-                    dataAddress: 2,
-                    dataSize: heapSize - 2,
-                    allocatorInfoIndices: [0, 1],
+                    dataAddress: metaSize,
+                    dataSize: heapSize - metaSize,
+                    allocatorInfoIndices: isDoubly ? [0, 1, 2] : [0, 1],
                     free: true,
                 },
             ],
@@ -46,7 +60,6 @@ export function InitModel(stackMaxSize: number, heapSize: number): DataModel {
 }
 
 export function NextStep(pars: InstructionStepParameters): InstructionStepResult {
-    //pars.model.pc++;
     var res = DoStep(pars);
     return {
         isEnd: res.isEnd,
