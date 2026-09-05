@@ -7,7 +7,8 @@
       "export": "next build",
       "start": "next start",
       "lint": "next lint",
-      "test": "tsx --test tests/**/*.test.ts"
+      "test": "tsx --test tests/**/*.test.ts",
+      "cli": "tsx cli/index.ts"
    },
    "dependencies": {
       "@fortawesome/fontawesome-svg-core": "^6.7.2",

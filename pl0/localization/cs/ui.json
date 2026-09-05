@@ -176,5 +176,23 @@
     "statsCount": "Počet",
     "statsMnemonic": "Instrukce",
     "statsCategory": "Kategorie",
-    "statsNoData": "Zatím žádná data o běhu. Spusťte program nebo krokujte pro sběr statistik."
+    "statsNoData": "Zatím žádná data o běhu. Spusťte program nebo krokujte pro sběr statistik.",
+
+    "helpTabInstructions": "Instrukce a architektura",
+    "helpTabCli": "Příkazová řádka a direktivy",
+    "cliHelpTitle": "Příkazová řádka (CLI) a ladicí direktivy v komentářích",
+    "cliHelpDesc": "Programy v PL/0 lze spouštět z příkazové řádky pro automatické testování, dávkové ověřování a ladění kompilátoru bez nutnosti grafického rozhraní.",
+    "cliHelpUsageTitle": "Použití v příkazové řádce",
+    "cliHelpDirectivesTitle": "Podporované direktivy v komentářích",
+    "cliHelpDirectivesNote": "Direktivy lze umístit na samostatný řádek (např. &REGS) nebo do komentáře (; &REGS, // &STK). Provádějí se při standardním běhu a jejich výstup je vypisován přímo do textového pole výstupu (a na standardní výstup v CLI), aniž by měnily stav výpočtu či adresy instrukcí.",
+    "directive_regs": "Vypíše obsah registrů báze (BASE), vrchol zásobníku (SP), čítač instrukcí (PC) a řídicí odkazy rámce.",
+    "directive_stk": "Vypíše obsah celého zásobníku od indexu 0 po vrchol zásobníku (SP) s označením speciálních položek.",
+    "directive_stka": "Vypíše obsah zásobníku od registru báze, neboli aktuální aktivační záznam (rámec).",
+    "directive_stkn": "Vypíše posledních n položek na vrcholu zásobníku.",
+    "directive_stkrg": "Vypíše obsah zásobníku od adresy a do adresy b včetně.",
+    "directive_echo": "Vypíše na ladicí výstup libovolný řetězec.",
+    "directive_mem": "Vypíše souhrn využití paměti (hloubka zásobníku, buňky haldy, aktivní bloky a maximální paměť).",
+    "directive_heap": "Vypíše detailní stav alokovaných bloků na dynamické haldě a jejich adresy.",
+    "directive_assert_tos": "Ověří, že na vrcholu zásobníku je očekávaná hodnota (bez odebrání ze zásobníku).",
+    "directive_stats": "Vypíše aktuální statistiky profilování a počty instrukcí."
 }

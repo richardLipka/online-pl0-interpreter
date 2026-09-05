@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 export function Help() {
     const { t } = useTranslation();
     const [showModal, setShowModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'instructions' | 'cli'>('instructions');
 
     const handleClose = () => setShowModal(false);
     const handleShow = () => setShowModal(true);
@@ -58,6 +59,24 @@ export function Help() {
                     <Modal.Title>{t('ui:help')}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #dee2e6', paddingBottom: '10px' }}>
+                        <Button
+                            variant={activeTab === 'instructions' ? 'primary' : 'outline-secondary'}
+                            size="sm"
+                            onClick={() => setActiveTab('instructions')}
+                        >
+                            {t('ui:helpTabInstructions')}
+                        </Button>
+                        <Button
+                            variant={activeTab === 'cli' ? 'primary' : 'outline-secondary'}
+                            size="sm"
+                            onClick={() => setActiveTab('cli')}
+                        >
+                            {t('ui:helpTabCli')}
+                        </Button>
+                    </div>
+
+                    {activeTab === 'instructions' ? (
                     <div>
                         <h2>{t('ui:instructions')}</h2>
 
@@ -304,6 +323,108 @@ export function Help() {
                             </tbody>
                         </Table>
                     </div>
+                    ) : (
+                    <div>
+                        <h2>{t('ui:cliHelpTitle')}</h2>
+                        <p style={{ color: '#4a5568' }}>{t('ui:cliHelpDesc')}</p>
+
+                        <h4 style={{ marginTop: '16px' }}>{t('ui:cliHelpUsageTitle')}</h4>
+                        <div
+                            style={{
+                                backgroundColor: '#2d3748',
+                                color: '#f7fafc',
+                                padding: '12px 16px',
+                                borderRadius: '6px',
+                                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                fontSize: '0.9em',
+                                overflowX: 'auto',
+                            }}
+                        >
+                            <div>npx tsx cli/index.ts [options] &lt;file.pl0 ...&gt;</div>
+                            <div style={{ color: '#a0aec0', marginTop: '4px' }}># Options: -i &lt;input&gt; | -s &lt;max-steps&gt; | -t (--trace) | --stats | -f &lt;text|json&gt; | --lang &lt;cs|en&gt;</div>
+                        </div>
+
+                        <h4 style={{ marginTop: '20px' }}>{t('ui:cliHelpDirectivesTitle')}</h4>
+                        <p style={{ color: '#718096', fontSize: '0.9em', fontStyle: 'italic' }}>
+                            {t('ui:cliHelpDirectivesNote')}
+                        </p>
+
+                        <Table striped bordered hover responsive style={{ fontSize: '0.9em' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#edf2f7' }}>
+                                    <th style={{ width: '220px' }}>Directive</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>&amp;REGS</code></td>
+                                    <td>{t('ui:directive_regs')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;STK</code></td>
+                                    <td>{t('ui:directive_stk')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;STKA</code></td>
+                                    <td>{t('ui:directive_stka')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;STKN &lt;n&gt;</code></td>
+                                    <td>{t('ui:directive_stkn')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;STKRG &lt;a&gt; &lt;b&gt;</code></td>
+                                    <td>{t('ui:directive_stkrg')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;ECHO &lt;string&gt;</code></td>
+                                    <td>{t('ui:directive_echo')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;MEM</code></td>
+                                    <td>{t('ui:directive_mem')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;HEAP</code></td>
+                                    <td>{t('ui:directive_heap')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;ASSERT_TOS &lt;val&gt;</code></td>
+                                    <td>{t('ui:directive_assert_tos')}</td>
+                                </tr>
+                                <tr>
+                                    <td><code>&amp;STATS</code></td>
+                                    <td>{t('ui:directive_stats')}</td>
+                                </tr>
+                            </tbody>
+                        </Table>
+
+                        <h5 style={{ marginTop: '16px' }}>Example PL/0 Program with Directives:</h5>
+                        <pre
+                            style={{
+                                backgroundColor: '#f7fafc',
+                                border: '1px solid #e2e8f0',
+                                padding: '12px',
+                                borderRadius: '6px',
+                                fontSize: '0.85em',
+                                fontFamily: 'Consolas, Monaco, monospace',
+                            }}
+                        >
+{`; Compute 5! = 120 with debugging directives
+INT 0, 4
+LIT 0, 5 ; initial value n
+STO 0, 3
+&REGS
+&STKA
+&ECHO "Variable initialized"
+LOD 0, 3
+&STKN 1
+&ASSERT_TOS 5
+RET 0, 0`}
+                        </pre>
+                    </div>
+                    )}
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="primary" onClick={handleClose}>

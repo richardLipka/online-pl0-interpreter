@@ -6,6 +6,7 @@ import {
     AllocatorType,
     CreateDefaultStatistics,
 } from './model';
+import { ExecuteDirective, Directive, DirectiveResult } from './directives';
 
 export function InitModel(
     stackMaxSize: number,
@@ -62,11 +63,41 @@ export function InitModel(
 }
 
 export function NextStep(pars: InstructionStepParameters): InstructionStepResult {
-    var res = DoStep(pars);
+    const executedDirectiveResults: DirectiveResult[] = [];
+
+    const instruction =
+        pars.model.pc >= 0 && pars.model.pc < pars.instructions.length
+            ? pars.instructions[pars.model.pc]
+            : undefined;
+
+    const runDirectives = (dirs?: Directive[]) => {
+        if (!dirs || dirs.length === 0 || pars.disableDirectives) return;
+        for (const dir of dirs) {
+            const res = ExecuteDirective(dir, pars.model, pars.instructions);
+            executedDirectiveResults.push(res);
+            if (res.message) {
+                if (pars.model.output.length > 0 && !pars.model.output.endsWith('\n')) {
+                    pars.model.output += '\n';
+                }
+                pars.model.output += res.message + '\n';
+            }
+        }
+    };
+
+    // 1. Run pre-directives before instruction execution
+    runDirectives(instruction?.preDirectives);
+
+    // 2. Perform instruction step
+    const res = DoStep(pars);
+
+    // 3. Run post-directives after instruction execution
+    runDirectives(instruction?.postDirectives);
+
     return {
         isEnd: res.isEnd,
         inputNextStep: res.inputNextStep,
-        output: res.output,
+        output: pars.model.output,
         warnings: res.warnings,
+        directiveResults: executedDirectiveResults,
     };
 }

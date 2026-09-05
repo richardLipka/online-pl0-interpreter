@@ -1,5 +1,5 @@
 import { Instruction, InstructionType } from './model';
-
+import { stripComment, parseDirectiveText, Directive } from './directives';
 import i18next from 'i18next';
 
 export interface ValidationResult {
@@ -106,6 +106,8 @@ export function ParseAndValidate(input: string): ValidationResult {
     let validationErrors: PreprocessingError[] = [];
     let parseErrors: PreprocessingError[] = [];
     let line_counter = 0;
+    let pendingPreDirectives: Directive[] = [];
+    let currentInstructionIdx = 0;
 
     for (let i = 0; i < lines.length; i++) {
         let trimmedLine = lines[i].trim();
@@ -113,7 +115,37 @@ export function ParseAndValidate(input: string): ValidationResult {
             continue;
         }
 
-        let splitLine = tokenizeLine(trimmedLine);
+        const { code, comment } = stripComment(trimmedLine);
+        const cleanCode = code.trim();
+
+        // 1. Line is purely a comment (or empty code)
+        if (cleanCode.length === 0) {
+            if (comment && comment.startsWith('&')) {
+                const dir = parseDirectiveText(comment, i + 1, currentInstructionIdx, 'before');
+                if (dir) {
+                    pendingPreDirectives.push(dir);
+                }
+            }
+            continue;
+        }
+
+        // 2. Line is a standalone directive without comment prefix
+        if (cleanCode.startsWith('&')) {
+            const dir = parseDirectiveText(cleanCode, i + 1, currentInstructionIdx, 'before');
+            if (dir) {
+                pendingPreDirectives.push(dir);
+            }
+            continue;
+        }
+
+        // 3. Line contains instruction code!
+        // Check if there is a trailing comment directive on this instruction line
+        let trailingDir: Directive | null = null;
+        if (comment && comment.startsWith('&')) {
+            trailingDir = parseDirectiveText(comment, i + 1, currentInstructionIdx, 'after');
+        }
+
+        let splitLine = tokenizeLine(cleanCode);
 
         if (splitLine.length == 3) {
             splitLine.unshift((line_counter++).toString());
@@ -194,8 +226,27 @@ export function ParseAndValidate(input: string): ValidationResult {
             parameter: parameter,
             parameter_str: parameter_str,
             explanationParts: null,
+            preDirectives: [...pendingPreDirectives],
+            postDirectives: trailingDir ? [trailingDir] : [],
         };
+        pendingPreDirectives = [];
+        currentInstructionIdx++;
         instructions.push(instruction);
+    }
+
+    // Directives after all instructions are attached as post-directives to the last instruction
+    if (pendingPreDirectives.length > 0 && instructions.length > 0) {
+        const lastIdx = instructions.length - 1;
+        const lastInst = instructions[lastIdx];
+        for (const dir of pendingPreDirectives) {
+            dir.instructionIndex = lastIdx;
+            dir.position = 'after';
+        }
+        lastInst.postDirectives = [
+            ...(lastInst.postDirectives || []),
+            ...pendingPreDirectives,
+        ];
+        pendingPreDirectives = [];
     }
 
     for (let i = 0; i < instructions.length; i++) {

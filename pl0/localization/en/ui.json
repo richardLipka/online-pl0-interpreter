@@ -176,5 +176,23 @@
     "statsCount": "Count",
     "statsMnemonic": "Instruction",
     "statsCategory": "Category",
-    "statsNoData": "No execution data yet. Run or step through the program to collect statistics."
+    "statsNoData": "No execution data yet. Run or step through the program to collect statistics.",
+
+    "helpTabInstructions": "Instructions & Architecture",
+    "helpTabCli": "CLI & Debug Directives",
+    "cliHelpTitle": "Headless Command Line Interface & Debug Directives",
+    "cliHelpDesc": "PL/0 programs can be executed headlessly from the command line for automated testing, batch grading, and compiler verification.",
+    "cliHelpUsageTitle": "CLI Usage & Commands",
+    "cliHelpDirectivesTitle": "Supported Comment Directives",
+    "cliHelpDirectivesNote": "Directives can be placed on a standalone line (e.g. &REGS) or inside comments (; &REGS, // &STK). They execute during standard runs and print their output directly to the standard output area (and standard output in CLI) without altering calculation state or bytecode instruction indices.",
+    "directive_regs": "Prints register contents: Base register (BASE), Stack Pointer (SP), Program Counter (PC), and caller frame links.",
+    "directive_stk": "Prints entire stack contents from index 0 to top of stack (SP) with special slot markers.",
+    "directive_stka": "Prints stack contents starting from the base register, representing the active activation record (current frame).",
+    "directive_stkn": "Prints the last n items from the top of stack.",
+    "directive_stkrg": "Prints stack contents from memory address a to address b inclusive.",
+    "directive_echo": "Prints arbitrary text message to the debug output stream.",
+    "directive_mem": "Prints memory footprint summary (stack depth, heap data cells, active blocks, and peak total memory).",
+    "directive_heap": "Prints detailed status of allocated blocks and memory addresses on the dynamic heap.",
+    "directive_assert_tos": "Asserts that the top of stack equals expected value without popping it.",
+    "directive_stats": "Prints a snapshot of instruction execution and profiling statistics."
 }

@@ -10,6 +10,7 @@ import {
 } from './allocator';
 
 import i18next from 'i18next';
+import type { Directive, DirectiveResult } from './directives';
 
 // ------------------------------------------- INTERFACES
 
@@ -210,12 +211,15 @@ export interface Instruction {
     parameter: number;
     parameter_str: string;
     explanationParts: ExplanationMessagePart[] | null;
+    preDirectives?: Directive[];
+    postDirectives?: Directive[];
 }
 
 export interface InstructionStepParameters {
     model: DataModel;
     instructions: Instruction[];
     input: string;
+    disableDirectives?: boolean;
 }
 export interface InstructionStepResult {
     isEnd: boolean;
@@ -224,6 +228,7 @@ export interface InstructionStepResult {
 
     warnings: string[];
     inputNextStep: string;
+    directiveResults?: DirectiveResult[];
 }
 
 export enum EmulationState {
