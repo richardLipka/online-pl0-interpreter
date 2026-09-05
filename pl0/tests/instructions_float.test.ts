@@ -96,6 +96,94 @@ describe('Floating-Point Instructions (ITR, RTI, OPF)', () => {
             assert.strictEqual(getTOS(res.model), '3');
         });
 
+        it('OPF 0, 4: MULT multiplies two floating point numbers', () => {
+            // 2.5 * 4.0 = 10.0
+            const code = [
+                'LIT 0, 2',
+                'LIT 0, 5',   // 2.5
+                'ITR 0, 0',
+                'LIT 0, 4',
+                'LIT 0, 0',   // 4.0
+                'ITR 0, 0',
+                'OPF 0, 4',   // multiply
+                'RTI 0, 1',   // whole part
+            ].join('\n');
+
+            const res = runProgram(code);
+            assert.strictEqual(getTOS(res.model), '10');
+        });
+
+        it('OPF 0, 5: DIV divides two floating point numbers normally', () => {
+            // 7.5 / 2.5 = 3.0
+            const code = [
+                'LIT 0, 7',
+                'LIT 0, 5',   // 7.5
+                'ITR 0, 0',
+                'LIT 0, 2',
+                'LIT 0, 5',   // 2.5
+                'ITR 0, 0',
+                'OPF 0, 5',   // divide
+                'RTI 0, 1',   // whole part
+            ].join('\n');
+
+            const res = runProgram(code);
+            assert.strictEqual(getTOS(res.model), '3');
+        });
+
+        it('OPF 0, 5: DIV on division by zero produces Infinity and logs soft warning without halting', () => {
+            const code = [
+                'LIT 0, 5',
+                'LIT 0, 0',   // 5.0
+                'ITR 0, 0',
+                'LIT 0, 0',
+                'LIT 0, 0',   // 0.0
+                'ITR 0, 0',
+                'OPF 0, 5',   // 5.0 / 0.0
+            ].join('\n');
+
+            const res = runProgram(code);
+            assert.strictEqual(res.isEnd, true);
+            assert.strictEqual(getTOS(res.model), 'Infinity');
+            assert.strictEqual(res.warnings.length, 1);
+            assert.match(res.warnings[0], /division by zero|Dělení nulou/i);
+        });
+
+        it('OPF 0, 6: MOD computes float modulo normally', () => {
+            // 7.5 % 2.0 = 1.5
+            const code = [
+                'LIT 0, 7',
+                'LIT 0, 5',   // 7.5
+                'ITR 0, 0',
+                'LIT 0, 2',
+                'LIT 0, 0',   // 2.0
+                'ITR 0, 0',
+                'OPF 0, 6',   // modulo
+                'RTI 0, 0',   // whole and fractional parts
+            ].join('\n');
+
+            const res = runProgram(code);
+            assert.strictEqual(res.model.stack.stackItems[0].value, '1');
+            assert.strictEqual(res.model.stack.stackItems[1].value, '5');
+        });
+
+        it('OPF 0, 6: MOD by zero produces NaN and logs soft warning without halting', () => {
+            const code = [
+                'LIT 0, 7',
+                'LIT 0, 5',   // 7.5
+                'ITR 0, 0',
+                'LIT 0, 0',
+                'LIT 0, 0',   // 0.0
+                'ITR 0, 0',
+                'OPF 0, 6',   // 7.5 % 0.0
+            ].join('\n');
+
+            const res = runProgram(code);
+            assert.strictEqual(res.isEnd, true);
+            assert.strictEqual(getTOS(res.model), 'NaN');
+            assert.strictEqual(res.warnings.length, 1);
+            assert.match(res.warnings[0], /modulo by zero|Modulo nulou/i);
+        });
+
         it('OPF comparisons: EQ, LESS_THAN, MORE_THAN', () => {
             // Compare 3.5 < 4.5 -> 1
             const codeLT = [
@@ -138,3 +226,4 @@ describe('Floating-Point Instructions (ITR, RTI, OPF)', () => {
         });
     });
 });
+

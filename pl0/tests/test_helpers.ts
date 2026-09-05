@@ -1,6 +1,22 @@
 import { ParseAndValidate } from '../core/validator';
 import { InitModel, NextStep } from '../core/operations';
 import { DataModel } from '../core/model';
+import i18next from 'i18next';
+import csCore from '../localization/cs/core.json';
+import enCore from '../localization/en/core.json';
+import csUi from '../localization/cs/ui.json';
+import enUi from '../localization/en/ui.json';
+
+if (!i18next.isInitialized) {
+    i18next.init({
+        lng: 'en',
+        fallbackLng: 'en',
+        resources: {
+            cs: { core: csCore, ui: csUi },
+            en: { core: enCore, ui: enUi },
+        },
+    });
+}
 
 export interface RunProgramResult {
     model: DataModel;

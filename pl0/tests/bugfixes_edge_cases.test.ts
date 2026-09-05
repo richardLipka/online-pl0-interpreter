@@ -13,7 +13,7 @@ describe('Bug Fixes and Edge Cases', () => {
             });
         });
 
-        it('OPF 0, 6: throws on float modulo by zero', () => {
+        it('OPF 0, 6: emits warning and yields NaN on float modulo by zero', () => {
             const code = [
                 'LIT 0, 10',
                 'LIT 0, 0',
@@ -23,9 +23,8 @@ describe('Bug Fixes and Edge Cases', () => {
                 'ITR 0, 0',
                 'OPF 0, 6',
             ].join('\n');
-            assert.throws(() => {
-                runProgram(code);
-            });
+            const res = runProgram(code);
+            assert.strictEqual(getTOS(res.model), 'NaN');
         });
     });
 

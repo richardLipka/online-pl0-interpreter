@@ -184,11 +184,15 @@ const Home: NextPage = () => {
 
             setInputTxt(stepResult.inputNextStep);
             setOutputTxt(stepResult.output);
-            setWarnings([...warnings, ...stepResult.warnings]);
+            if (stepResult.warnings && stepResult.warnings.length > 0) {
+                setWarnings((prev) => [...prev, ...stepResult.warnings]);
+            }
 
             explainNextInstruction();
         } catch (e) {
-            alert((e as Error).message);
+            const errorMsg = (e as Error).message;
+            setWarnings((prev) => [...prev, errorMsg]);
+            alert(errorMsg);
             setEmulationState(EmulationState.ERROR);
             isPlayingRef.current = false;
             setIsPlaying(false);
@@ -322,7 +326,7 @@ const Home: NextPage = () => {
                         />
                     </div>
                     <div className={styles.warnings}>
-                        <WarningsView warnings={warnings} />
+                        <WarningsView warnings={warnings} onClear={() => setWarnings([])} />
                     </div>
                 </>
             )}

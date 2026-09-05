@@ -11,6 +11,10 @@
     "headerInput": "Input",
     "headerOutput": "Output",
     "headerWarnings": "Warnings",
+    "noWarnings": "No warnings recorded",
+    "clearWarnings": "Clear log",
+    "warningItemPrefix": "Warning",
+    "errorItemPrefix": "Error",
 
     "notAllocated": "Not allocated",
     "notAllocatedMeta": "Not allocated, contains block metadata",

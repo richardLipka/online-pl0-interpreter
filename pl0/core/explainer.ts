@@ -66,10 +66,15 @@ function GetValuesFromStack(
     count: number,
     decrementCurrentFrame: boolean = false
 ) {
+    if (index < count - 1 || index < 0) {
+        const msg = String(i18next.t('core:modelStackNoOperands') || 'Not enough operands on stack to continue (required %1, found %2)');
+        throw new Error(msg.replace('%1', count.toString()).replace('%2', Math.max(0, index + 1).toString()));
+    }
     let retvals = [];
     for (let i = 0; i < count; i++) {
         if (!CheckSPInBounds(index - i)) {
-            throw new Error(i18next.t('core:modelStackNegativeError'));
+            const msg = String(i18next.t('core:modelStackNoOperands') || 'Not enough operands on stack to continue (required %1, found %2)');
+            throw new Error(msg.replace('%1', count.toString()).replace('%2', Math.max(0, index + 1).toString()));
         }
         retvals.push(stack.stackItems[index - i].value);
     }

@@ -162,10 +162,15 @@ function GetValuesFromStack(
     count: number,
     decrementCurrentFrame: boolean = true
 ) {
+    if (index < count - 1 || index < 0) {
+        const msg = String(i18next.t('core:modelStackNoOperands') || 'Not enough operands on stack to continue (required %1, found %2)');
+        throw new Error(msg.replace('%1', count.toString()).replace('%2', Math.max(0, index + 1).toString()));
+    }
     let retvals = [];
     for (let i = 0; i < count; i++) {
         if (!CheckSPInBounds(index - i)) {
-            throw new Error(i18next.t('core:modelStackNegativeError'));
+            const msg = String(i18next.t('core:modelStackNoOperands') || 'Not enough operands on stack to continue (required %1, found %2)');
+            throw new Error(msg.replace('%1', count.toString()).replace('%2', Math.max(0, index + 1).toString()));
         }
         retvals.push(stack.stackItems[index - i].value);
         if (decrementCurrentFrame && stack.stackFrames.length > 0) {
@@ -329,12 +334,13 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.pc++;
             break;
         case InstructionType.JMP:
-            if (parameter < 0 || parameter >= params.instructions.length) {
-                throw new Error(
-                    i18next.t('core:modelInstructionOutOfBounds1') +
-                    parameter +
-                    i18next.t('core:modelInstructionOutOfBounds2')
-                );
+            if (parameter < 0) {
+                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
+                throw new Error(msg.replace('%1', parameter.toString()));
+            }
+            if (parameter >= params.instructions.length) {
+                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
+                throw new Error(msg.replace('%1', parameter.toString()));
             }
             params.model.pc = parameter;
             break;
@@ -342,12 +348,13 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var operands = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
             if (operands[0] == 0) {
-                if (parameter < 0 || parameter >= params.instructions.length) {
-                    throw new Error(
-                        i18next.t('core:modelInstructionOutOfBounds1') +
-                        parameter +
-                        i18next.t('core:modelInstructionOutOfBounds2')
-                    );
+                if (parameter < 0) {
+                    const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
+                    throw new Error(msg.replace('%1', parameter.toString()));
+                }
+                if (parameter >= params.instructions.length) {
+                    const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
+                    throw new Error(msg.replace('%1', parameter.toString()));
                 }
                 params.model.pc = parameter;
             } else {
@@ -375,12 +382,13 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 false
             );
 
-            if (parameter < 0 || parameter >= params.instructions.length) {
-                throw new Error(
-                    i18next.t('core:modelInstructionOutOfBounds1') +
-                    parameter +
-                    i18next.t('core:modelInstructionOutOfBounds2')
-                );
+            if (parameter < 0) {
+                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
+                throw new Error(msg.replace('%1', parameter.toString()));
+            }
+            if (parameter >= params.instructions.length) {
+                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
+                throw new Error(msg.replace('%1', parameter.toString()));
             }
 
             stack.stackFrames.push({ index: params.model.sp + 1, size: 0 });
@@ -401,14 +409,33 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 false
             );
 
+            let retPc = Number(res[0]);
+            let retBase = Number(res[1]);
+
             params.model.sp = params.model.base - 1;
-            params.model.pc = Number(res[0]);
-            params.model.base = Number(res[1]);
+            params.model.pc = retPc;
+            params.model.base = retBase;
             params.model.stack.stackFrames.pop();
+
+            if (retPc < 0) {
+                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
+                throw new Error(msg.replace('%1', retPc.toString()));
+            }
+            if (retPc > params.instructions.length) {
+                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
+                throw new Error(msg.replace('%1', retPc.toString()));
+            }
             break;
         case InstructionType.LOD:
             var base = FindBase(stack, params.model.base, level);
             var address = base + parameter;
+            if (parameter < 0 || address < 0) {
+                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
+                warnings.push(msg.replace('%1', address.toString()));
+            } else if (address > params.model.sp) {
+                const msg = String(i18next.t('core:modelStackWarnReadUnallocated') || 'Warning: Reading from unallocated stack memory at index %1 (SP is %2)');
+                warnings.push(msg.replace('%1', address.toString()).replace('%2', params.model.sp.toString()));
+            }
             params.model.sp = PushOntoStack(
                 stack,
                 params.model.sp,
@@ -423,6 +450,22 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             let stoVal = res[0];
             if (typeof stoVal === 'string' && !Number.isNaN(Number(stoVal)) && stoVal.trim() !== '') {
                 stoVal = Number(stoVal);
+            }
+            if (parameter < 0 || address < 0) {
+                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
+                warnings.push(msg.replace('%1', address.toString()));
+            } else if (parameter === 0) {
+                const msg = String(i18next.t('core:modelStackWarnWriteSB') || 'Warning: Overwriting static base (SB) at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', address.toString()).replace('%2', stoVal.toString()));
+            } else if (parameter === 1) {
+                const msg = String(i18next.t('core:modelStackWarnWriteDB') || 'Warning: Overwriting dynamic base (DB) at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', address.toString()).replace('%2', stoVal.toString()));
+            } else if (parameter === 2) {
+                const msg = String(i18next.t('core:modelStackWarnWritePC') || 'Warning: Overwriting return PC at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', address.toString()).replace('%2', stoVal.toString()));
+            } else if (address > params.model.sp) {
+                const msg = String(i18next.t('core:modelStackWarnWriteUnallocated') || 'Warning: Write into unallocated stack memory at index %1');
+                warnings.push(msg.replace('%1', address.toString()));
             }
             PutOntoStack(stack, address, stoVal);
             params.model.sp--;
@@ -466,18 +509,26 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.NEW:
             var count = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
+            let reqSize = Number(count[0]);
 
-            if (Number(count[0]) <= 0 || Number(count[0]) > params.model.heap.size) {
+            if (reqSize <= 0 || reqSize > params.model.heap.size) {
+                const msg = String(i18next.t('core:modelHeapWarnAllocFailed') || 'Warning: Heap allocation failed for requested size %1 (returned -1)');
+                warnings.push(msg.replace('%1', reqSize.toString()));
                 params.model.sp = PushOntoStack(
                     stack,
                     params.model.sp,
                     ConvertToStackItems(-1)
                 );
             } else {
+                let allocatedAddr = Allocate(heap, reqSize);
+                if (allocatedAddr === -1) {
+                    const msg = String(i18next.t('core:modelHeapWarnAllocFailed') || 'Warning: Heap allocation failed for requested size %1 (returned -1)');
+                    warnings.push(msg.replace('%1', reqSize.toString()));
+                }
                 params.model.sp = PushOntoStack(
                     stack,
                     params.model.sp,
-                    ConvertToStackItems(Allocate(heap, Number(count[0])))
+                    ConvertToStackItems(allocatedAddr)
                 );
             }
             params.model.pc++;
@@ -560,10 +611,19 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var values = GetValuesFromStack(stack, params.model.sp, 2);
             params.model.sp -= 2;
             var base = FindBase(stack, params.model.base, Number(values[1]));
+            let pldOffset = Number(values[0]);
+            let pldAddress = base + pldOffset;
+            if (pldOffset < 0 || pldAddress < 0) {
+                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
+                warnings.push(msg.replace('%1', pldAddress.toString()));
+            } else if (pldAddress > params.model.sp) {
+                const msg = String(i18next.t('core:modelStackWarnReadUnallocated') || 'Warning: Reading from unallocated stack memory at index %1 (SP is %2)');
+                warnings.push(msg.replace('%1', pldAddress.toString()).replace('%2', params.model.sp.toString()));
+            }
             params.model.sp = PushOntoStack(
                 stack,
                 params.model.sp,
-                ConvertToStackItems(GetValueFromStack(stack, base + Number(values[0])))
+                ConvertToStackItems(GetValueFromStack(stack, pldAddress))
             );
             params.model.pc++;
             break;
@@ -571,15 +631,33 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var values = GetValuesFromStack(stack, params.model.sp, 3);
             params.model.sp -= 3;
             var base = FindBase(stack, params.model.base, Number(values[1]));
+            let pstOffset = Number(values[0]);
+            let pstAddress = base + pstOffset;
             let pstVal = values[2];
             if (typeof pstVal === 'string' && !Number.isNaN(Number(pstVal)) && pstVal.trim() !== '') {
                 pstVal = Number(pstVal);
             }
-            PutOntoStack(stack, base + Number(values[0]), pstVal);
+            if (pstOffset < 0 || pstAddress < 0) {
+                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
+                warnings.push(msg.replace('%1', pstAddress.toString()));
+            } else if (pstOffset === 0) {
+                const msg = String(i18next.t('core:modelStackWarnWriteSB') || 'Warning: Overwriting static base (SB) at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', pstAddress.toString()).replace('%2', pstVal.toString()));
+            } else if (pstOffset === 1) {
+                const msg = String(i18next.t('core:modelStackWarnWriteDB') || 'Warning: Overwriting dynamic base (DB) at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', pstAddress.toString()).replace('%2', pstVal.toString()));
+            } else if (pstOffset === 2) {
+                const msg = String(i18next.t('core:modelStackWarnWritePC') || 'Warning: Overwriting return PC at stack index %1 with value %2');
+                warnings.push(msg.replace('%1', pstAddress.toString()).replace('%2', pstVal.toString()));
+            } else if (pstAddress > params.model.sp) {
+                const msg = String(i18next.t('core:modelStackWarnWriteUnallocated') || 'Warning: Write into unallocated stack memory at index %1');
+                warnings.push(msg.replace('%1', pstAddress.toString()));
+            }
+            PutOntoStack(stack, pstAddress, pstVal);
             params.model.pc++;
             break;
         case InstructionType.OPF:
-            params.model.sp = PerformOPF(stack, parameter, params.model.sp);
+            params.model.sp = PerformOPF(stack, parameter, params.model.sp, warnings, params.model.pc);
             params.model.pc++;
             break;
         case InstructionType.ITR: /* Integer to real */
@@ -815,7 +893,12 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
     return sp;
 }
 
-function RoundFloat(mantissa:string, exponent:number, decimals:number = 6): number[] {
+function RoundFloat(mantissa:string, exponent:number, decimals:number = 6): (number | string)[] {
+    let num = Number(mantissa);
+    if (!Number.isFinite(num)) {
+        if (Number.isNaN(num)) return ['NaN', exponent];
+        return [num > 0 ? 'Infinity' : '-Infinity', exponent];
+    }
     var mantissa_orig_len = mantissa.length;
     mantissa = mantissa.substring(0, decimals);
     exponent += mantissa_orig_len - mantissa.length;
@@ -823,7 +906,7 @@ function RoundFloat(mantissa:string, exponent:number, decimals:number = 6): numb
     return [Number(mantissa), exponent];
 }
 
-function PerformOPF(stack: Stack, operation: number, sp: number): number {
+function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: string[], pc?: number): number {
     let e_op = operation as OperationType;
     let operands;
     let mantissa;
@@ -949,7 +1032,32 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             exponent_1 = Number(operands[3]);
 
             if (mantissa_2 == 0) {
-                throw new Error(i18next.t('core:modelDivideByZero'));
+                let divResult = mantissa_1 / mantissa_2;
+                let resMantissa = divResult.toString();
+                let resExponent = 0;
+
+                if (warnings) {
+                    const instrIdx = pc !== undefined ? pc.toString() : '?';
+                    const msg = String(i18next.t('core:modelFloatWarnDivideByZero') || 'Warning: Floating-point division by zero at instruction %1 (result is %2)');
+                    warnings.push(msg.replace('%1', instrIdx).replace('%2', resMantissa));
+                }
+
+                sp = PushOntoStack(
+                    stack,
+                    sp,
+                    ConvertToStackItems(resExponent, resMantissa)
+                );
+                break;
+            }
+
+            if (!Number.isFinite(mantissa_1) || !Number.isFinite(mantissa_2)) {
+                let divResult = mantissa_1 / mantissa_2;
+                sp = PushOntoStack(
+                    stack,
+                    sp,
+                    ConvertToStackItems(0, divResult.toString())
+                );
+                break;
             }
 
             /* Divide mantissas */
@@ -995,7 +1103,31 @@ function PerformOPF(stack: Stack, operation: number, sp: number): number {
             exponent_1 = Number(operands[3]);
 
             if (mantissa_2 == 0) {
-                throw new Error(i18next.t('core:modelDivideByZero'));
+                let resMantissa = 'NaN';
+                let resExponent = 0;
+
+                if (warnings) {
+                    const instrIdx = pc !== undefined ? pc.toString() : '?';
+                    const msg = String(i18next.t('core:modelFloatWarnModuloByZero') || 'Warning: Floating-point modulo by zero at instruction %1 (result is NaN)');
+                    warnings.push(msg.replace('%1', instrIdx));
+                }
+
+                sp = PushOntoStack(
+                    stack,
+                    sp,
+                    ConvertToStackItems(resExponent, resMantissa)
+                );
+                break;
+            }
+
+            if (!Number.isFinite(mantissa_1) || !Number.isFinite(mantissa_2)) {
+                let modResult = mantissa_1 % mantissa_2;
+                sp = PushOntoStack(
+                    stack,
+                    sp,
+                    ConvertToStackItems(0, modResult.toString())
+                );
+                break;
             }
 
             /* Align exponents */

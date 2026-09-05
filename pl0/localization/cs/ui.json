@@ -11,6 +11,10 @@
     "headerInput": "Vstup",
     "headerOutput": "Výstup",
     "headerWarnings": "Varování",
+    "noWarnings": "Žádná zaznamenaná varování",
+    "clearWarnings": "Vymazat záznam",
+    "warningItemPrefix": "Varování",
+    "errorItemPrefix": "Chyba",
 
     "notAllocated": "Nealokováno",
     "notAllocatedMeta": "Nealokováno, obsahuje metadata bloku",
