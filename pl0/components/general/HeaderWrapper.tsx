@@ -3,7 +3,7 @@ import { primary } from '../../constants/Colors';
 
 type WrapperProps = {
     children: React.ReactNode;
-    header: string;
+    header: React.ReactNode;
 };
 
 export function HeaderWrapper(props: WrapperProps) {

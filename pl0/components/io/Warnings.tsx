@@ -5,6 +5,7 @@ import { HeaderWrapper } from '../general/HeaderWrapper';
 type WarningsViewProps = {
     warnings: string[];
     onClear?: () => void;
+    hideWrapper?: boolean;
 };
 
 export function WarningsView(props: WarningsViewProps) {
@@ -36,16 +37,15 @@ export function WarningsView(props: WarningsViewProps) {
         );
     };
 
-    return (
-        <HeaderWrapper header={headerTitle}>
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%',
-                    justifyContent: 'space-between',
-                }}
-            >
+    const content = (
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                justifyContent: 'space-between',
+            }}
+        >
                 <div
                     style={{
                         overflowY: 'auto',
@@ -143,6 +143,15 @@ export function WarningsView(props: WarningsViewProps) {
                     </div>
                 )}
             </div>
+    );
+
+    if (props.hideWrapper) {
+        return content;
+    }
+
+    return (
+        <HeaderWrapper header={headerTitle}>
+            {content}
         </HeaderWrapper>
     );
 }

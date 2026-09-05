@@ -18,7 +18,7 @@ import { Heap } from '../components/heap';
 import { Footer } from '../components/footer';
 import { ExplainInstruction } from '../core/explainer';
 import { IO } from '../components/io';
-import { WarningsView } from '../components/io/Warnings';
+import { BottomPanel } from '../components/general/BottomPanel';
 import { ControlPanel } from '../components/controlpanel';
 import {
     HeapToBeHighlighted,
@@ -191,6 +191,9 @@ const Home: NextPage = () => {
             explainNextInstruction();
         } catch (e) {
             const errorMsg = (e as Error).message;
+            if (model && model.stats) {
+                model.stats.haltedOnError = true;
+            }
             setWarnings((prev) => [...prev, errorMsg]);
             alert(errorMsg);
             setEmulationState(EmulationState.ERROR);
@@ -326,7 +329,12 @@ const Home: NextPage = () => {
                         />
                     </div>
                     <div className={styles.warnings}>
-                        <WarningsView warnings={warnings} onClear={() => setWarnings([])} />
+                        <BottomPanel
+                            warnings={warnings}
+                            onClearWarnings={() => setWarnings([])}
+                            stats={model?.stats}
+                            emulationState={emulationState}
+                        />
                     </div>
                 </>
             )}

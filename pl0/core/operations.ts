@@ -4,6 +4,7 @@ import {
     InstructionStepResult,
     DoStep,
     AllocatorType,
+    CreateDefaultStatistics,
 } from './model';
 
 export function InitModel(
@@ -54,6 +55,7 @@ export function InitModel(
                 },
             ],
         },
+        stats: CreateDefaultStatistics(),
     };
 
     return m;

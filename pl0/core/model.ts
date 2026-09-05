@@ -13,6 +13,89 @@ import i18next from 'i18next';
 
 // ------------------------------------------- INTERFACES
 
+export interface ExecutionStatistics {
+    totalInstructionsExecuted: number;
+    completedNormally: boolean;
+    haltedOnError: boolean;
+    lastHaltError?: string;
+
+    instructionCounts: Record<string, number>;
+    categoryCounts: {
+        arithmeticLogic: number;
+        memoryStack: number;
+        controlFlow: number;
+        procedureCalls: number;
+        heapOperations: number;
+        ioOperations: number;
+    };
+
+    jumpsExecuted: number;
+    conditionalJumpsExecuted: number;
+    conditionalJumpsTaken: number;
+    conditionalJumpsNotTaken: number;
+    branchTakenRatio: number;
+
+    procedureCallsCount: number;
+    procedureReturnsCount: number;
+    peakCallStackDepth: number;
+    currentCallStackDepth: number;
+
+    currentStackSize: number;
+    peakStackSize: number;
+
+    currentHeapAllocatedCells: number;
+    peakHeapAllocatedCells: number;
+    totalHeapAllocations: number;
+    totalHeapDeallocations: number;
+    activeHeapBlocks: number;
+    peakHeapBlocks: number;
+
+    peakTotalMemoryOccupied: number;
+    warningsCount: number;
+}
+
+export function CreateDefaultStatistics(): ExecutionStatistics {
+    return {
+        totalInstructionsExecuted: 0,
+        completedNormally: false,
+        haltedOnError: false,
+
+        instructionCounts: {},
+        categoryCounts: {
+            arithmeticLogic: 0,
+            memoryStack: 0,
+            controlFlow: 0,
+            procedureCalls: 0,
+            heapOperations: 0,
+            ioOperations: 0,
+        },
+
+        jumpsExecuted: 0,
+        conditionalJumpsExecuted: 0,
+        conditionalJumpsTaken: 0,
+        conditionalJumpsNotTaken: 0,
+        branchTakenRatio: 0,
+
+        procedureCallsCount: 0,
+        procedureReturnsCount: 0,
+        peakCallStackDepth: 1,
+        currentCallStackDepth: 1,
+
+        currentStackSize: 0,
+        peakStackSize: 0,
+
+        currentHeapAllocatedCells: 0,
+        peakHeapAllocatedCells: 0,
+        totalHeapAllocations: 0,
+        totalHeapDeallocations: 0,
+        activeHeapBlocks: 0,
+        peakHeapBlocks: 0,
+
+        peakTotalMemoryOccupied: 0,
+        warningsCount: 0,
+    };
+}
+
 export interface DataModel {
     pc: number;
     base: number;
@@ -23,6 +106,8 @@ export interface DataModel {
 
     input: string;
     output: string;
+
+    stats?: ExecutionStatistics;
 }
 
 export interface Stack {
@@ -312,6 +397,62 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
     let mantissa;
     let exponent;
 
+    if (!params.model.stats) {
+        params.model.stats = CreateDefaultStatistics();
+    }
+    const stats = params.model.stats;
+    stats.totalInstructionsExecuted++;
+
+    const mnemonic = InstructionType[op] || 'UNKNOWN';
+    stats.instructionCounts[mnemonic] = (stats.instructionCounts[mnemonic] || 0) + 1;
+
+    switch (op) {
+        case InstructionType.OPR:
+        case InstructionType.OPF:
+        case InstructionType.ITR:
+        case InstructionType.RTI:
+            stats.categoryCounts.arithmeticLogic++;
+            break;
+        case InstructionType.LIT:
+        case InstructionType.LOD:
+        case InstructionType.STO:
+        case InstructionType.INT:
+        case InstructionType.PLD:
+        case InstructionType.PST:
+            stats.categoryCounts.memoryStack++;
+            break;
+        case InstructionType.JMP:
+        case InstructionType.JMC:
+            stats.categoryCounts.controlFlow++;
+            break;
+        case InstructionType.CAL:
+        case InstructionType.RET:
+            stats.categoryCounts.procedureCalls++;
+            break;
+        case InstructionType.NEW:
+        case InstructionType.DEL:
+        case InstructionType.LDA:
+        case InstructionType.STA:
+            stats.categoryCounts.heapOperations++;
+            break;
+        case InstructionType.REA:
+        case InstructionType.WRI:
+            stats.categoryCounts.ioOperations++;
+            break;
+    }
+
+    if (op === InstructionType.JMP) {
+        stats.jumpsExecuted++;
+    } else if (op === InstructionType.CAL) {
+        stats.procedureCallsCount++;
+    } else if (op === InstructionType.RET) {
+        stats.procedureReturnsCount++;
+    } else if (op === InstructionType.NEW) {
+        stats.totalHeapAllocations++;
+    } else if (op === InstructionType.DEL) {
+        stats.totalHeapDeallocations++;
+    }
+
     switch (op) {
         case InstructionType.LIT:
             let litVal: number | string = parameter_str;
@@ -345,9 +486,11 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.pc = parameter;
             break;
         case InstructionType.JMC:
+            stats.conditionalJumpsExecuted++;
             var operands = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
             if (operands[0] == 0) {
+                stats.conditionalJumpsTaken++;
                 if (parameter < 0) {
                     const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
                     throw new Error(msg.replace('%1', parameter.toString()));
@@ -358,6 +501,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 }
                 params.model.pc = parameter;
             } else {
+                stats.conditionalJumpsNotTaken++;
                 params.model.pc++;
             }
             break;
@@ -743,6 +887,36 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
     }
 
     UpdateHeapBlocks(heap);
+
+    stats.currentStackSize = Math.max(0, params.model.sp + 1);
+    stats.peakStackSize = Math.max(stats.peakStackSize, stats.currentStackSize);
+
+    stats.currentCallStackDepth = stack.stackFrames.length;
+    stats.peakCallStackDepth = Math.max(stats.peakCallStackDepth, stack.stackFrames.length);
+
+    const allocatedBlocks = heap.heapBlocks.filter((b) => !b.free);
+    stats.activeHeapBlocks = allocatedBlocks.length;
+    stats.peakHeapBlocks = Math.max(stats.peakHeapBlocks, stats.activeHeapBlocks);
+
+    stats.currentHeapAllocatedCells = allocatedBlocks.reduce((sum, b) => sum + b.dataSize, 0);
+    stats.peakHeapAllocatedCells = Math.max(stats.peakHeapAllocatedCells, stats.currentHeapAllocatedCells);
+
+    stats.peakTotalMemoryOccupied = Math.max(
+        stats.peakTotalMemoryOccupied,
+        stats.peakStackSize + stats.peakHeapAllocatedCells
+    );
+
+    if (stats.conditionalJumpsExecuted > 0) {
+        stats.branchTakenRatio = Math.round((stats.conditionalJumpsTaken / stats.conditionalJumpsExecuted) * 100);
+    }
+
+    if (warnings && warnings.length > 0) {
+        stats.warningsCount += warnings.length;
+    }
+
+    if (isEnd) {
+        stats.completedNormally = true;
+    }
 
     return {
         warnings: warnings,
