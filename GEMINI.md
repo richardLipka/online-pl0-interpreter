@@ -64,25 +64,66 @@ The simulator executes instructions against a `DataModel` CPU state:
 - **`WRI 0, 0` (Write)**: Pops top of stack and writes it as a character / ASCII symbol to the output stream (handles newlines `\n`).
 
 ### 5. Extended Instructions: Floating-Point & Interrupts
-- **`OPF 0, A`**: Floating-point operations (add, sub, mul, div, comparisons).
+- **`OPF 0, A`**: Floating-point operations (add, sub, mul, div, comparisons). Floating-point division and modulo by zero follow IEEE-754 hardware semantics, yielding `Infinity` or `NaN` and recording a soft warning without halting execution.
 - **`ITR 0, 0`**: Convert integer components on stack to real (floating-point) representation with mantissa and exponent.
 - **`RTI 0, 0`**: Convert real to integer representation or return from interrupt.
+
+### 6. Division by Zero Semantics (Hardware Realism)
+The simulator mirrors real CPU/FPU hardware execution semantics:
+- **Integer Division / Modulo (`OPR 0, 5`, `OPR 0, 6`)**: Integer division by zero triggers a fatal CPU fault and halts execution immediately with a localized runtime error.
+- **Floating-Point Division / Modulo (`OPF 0, 5`, `OPF 0, 6`)**: Floating-point division by zero produces IEEE-754 signed `Infinity` (or `NaN` for `0.0 / 0.0` or `float % 0.0`), appends a descriptive soft warning to the warning log, and allows computation to continue safely.
+
+### 7. Comment Directives for Compiler Testing & Debugging ([pl0/core/directives.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/directives.ts))
+Directives can be placed on standalone lines or inside comments (e.g. `; &REGS`, `// &STK`). They execute at their source position without advancing or altering program counter (`pc`), stack values, or instruction addresses:
+- **`&REGS`**: Output registers: Base register (`BASE`), Stack Pointer (`SP`), Program Counter (`PC`).
+- **`&STK`**: Output entire stack memory from index `0` to `SP`.
+- **`&STKA`**: Output stack contents from `base` to `SP` (current activation record / stack frame).
+- **`&STKN <n>`**: Output top `n` items of the stack.
+- **`&STKRG <a> <b>`**: Output stack values within index range `[a, b]`.
+- **`&ECHO <text>`**: Print custom message or marker string to output.
+- **`&MEM`**: Output memory summary (stack depth, allocated heap cells, active blocks).
+- **`&HEAP`**: Output detailed allocation table and contents of heap blocks.
+- **`&ASSERT_TOS <expected>`**: Verify that top-of-stack equals `<expected>` without popping. Fails with diagnostic error if value mismatch.
+- **`&STATS`**: Output snapshot of instruction profiling statistics.
+
+Directives output streams directly to standard output (`model.output` in GUI and stdout in CLI) without altering calculation state.
+
+### 8. Headless CLI Runner ([pl0/cli/runner.ts](file:///f:/Vyvoj/AI/PL0/pl0/cli/runner.ts), [pl0/cli/index.ts](file:///f:/Vyvoj/AI/PL0/pl0/cli/index.ts))
+Provides an automated CLI execution environment for batch testing and verifying PL/0 compiler code generation:
+```bash
+npm run cli -- [options] <files.pl0 ...>
+# or
+npx tsx cli/index.ts [options] <files.pl0 ...>
+```
+Supported options:
+- `-i, --input <text|file>`: Standard input string or file for `REA` instructions.
+- `-s, --max-steps <num>`: Instruction limit per program (default: 100,000).
+- `-t, --trace`: Step-by-step execution trace (PC, mnemonic, operands, top of stack).
+- `--stats`: Print instruction frequency profiling, branch statistics, and memory usage.
+- `--no-debug`: Disable execution of comment directives.
+- `-f, --format <text|json>`: Formats output as human-readable text or structured JSON for automated grading and CI/CD pipelines.
+- `--lang <en|cs>`: Localization language for diagnostics and messages (default: `en`).
+- `-h, --help`: CLI syntax and directive documentation.
 
 ---
 
 ## Directory Structure
 - [pl0/](file:///f:/Vyvoj/AI/PL0/pl0): Next.js web application root.
+  - [pl0/cli/](file:///f:/Vyvoj/AI/PL0/pl0/cli):
+    - [index.ts](file:///f:/Vyvoj/AI/PL0/pl0/cli/index.ts): CLI executable entry point and argument parsing.
+    - [runner.ts](file:///f:/Vyvoj/AI/PL0/pl0/cli/runner.ts): Headless execution engine, text and JSON report formatters.
   - [pl0/core/](file:///f:/Vyvoj/AI/PL0/pl0/core):
-    - [model.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/model.ts): CPU state, instruction execution loop (`DoStep`), stack frame management (`FindBase`).
+    - [model.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/model.ts): CPU state, instruction execution loop (`DoStep`), stack frame management (`FindBase`), `ExecutionStats` profiler.
+    - [directives.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/directives.ts): Comment directive parser and execution engine (`&REGS`, `&STK`, `&ASSERT_TOS`, etc.).
     - [allocator.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/allocator.ts): Heap allocator implementation (`Allocate`, `Free`, block tracking).
     - [explainer.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/explainer.ts): Generates step explanations for CPU instructions in Czech/English.
-    - [validator.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/validator.ts): Validates assembly input, instruction mnemonics, operands, and structure.
+    - [validator.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/validator.ts): Validates assembly input, instruction mnemonics, operands, directives, and structure.
     - [highlighting.ts](file:///f:/Vyvoj/AI/PL0/pl0/core/highlighting.ts): UI step and variable highlighting helpers.
   - [pl0/localization/](file:///f:/Vyvoj/AI/PL0/pl0/localization):
     - `cs/core.json`, `cs/ui.json`: Czech localizations.
     - `en/core.json`, `en/ui.json`: English localizations.
-  - [pl0/components/](file:///f:/Vyvoj/AI/PL0/pl0/components): UI components visualizing CPU registers, stack frames, heap, and instructions.
-  - [pl0/tests/](file:///f:/Vyvoj/AI/PL0/pl0/tests): Automated unit tests verifying each PL/0 instruction and demonstration programs.
+  - [pl0/components/](file:///f:/Vyvoj/AI/PL0/pl0/components): UI components visualizing CPU registers, stack frames, heap, instructions, statistics, and help modal.
+  - [pl0/tests/](file:///f:/Vyvoj/AI/PL0/pl0/tests): Automated unit tests verifying each PL/0 instruction, demonstration programs, warnings, statistics, and CLI directives.
   - [pl0/pages/](file:///f:/Vyvoj/AI/PL0/pl0/pages): Next.js route entry points.
 
 ---
@@ -91,9 +132,10 @@ The simulator executes instructions against a `DataModel` CPU state:
 All commands should be run inside the `pl0/` directory:
 - **Install dependencies**: `npm install`
 - **Start development server**: `npm run dev`
+- **Run automated test suite**: `npm test`
+- **Run headless CLI**: `npm run cli -- [options] <files.pl0>`
 - **Build production bundle**: `npm run build`
 - **Export static site**: `npm run export`
-- **Run tests**: `npm test`
 - **Lint**: `npm run lint`
 
 ---
