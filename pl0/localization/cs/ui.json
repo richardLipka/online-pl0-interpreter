@@ -4,6 +4,7 @@
     "btnBack": "Krok zpět",
     "btnForward": "Krok vpřed",
     "btnPlay": "Spustit",
+    "btnStop": "Zastavit",
     "btnReset": "Obnovit",
     "headerInstructions": "Instrukce",
     "headerStack": "Zásobník",
@@ -194,5 +195,16 @@
     "directive_mem": "Vypíše souhrn využití paměti (hloubka zásobníku, buňky haldy, aktivní bloky a maximální paměť).",
     "directive_heap": "Vypíše detailní stav alokovaných bloků na dynamické haldě a jejich adresy.",
     "directive_assert_tos": "Ověří, že na vrcholu zásobníku je očekávaná hodnota (bez odebrání ze zásobníku).",
-    "directive_stats": "Vypíše aktuální statistiky profilování a počty instrukcí."
+    "directive_stats": "Vypíše aktuální statistiky profilování a počty instrukcí.",
+
+    "speedLabel": "Rychlost běhu",
+    "stepDelay": "Prodleva kroku",
+    "speedFast": "Rychle",
+    "speedSlow": "Pomalu",
+    "msPerStep": "ms / krok",
+    "swapPanels": "Vyměnit panely (paměť / statistiky)",
+    "maximizeStats": "Zvětšit statistiky přes paměť",
+    "maximizeMemory": "Zvětšit paměť přes statistiky",
+    "splitEvenly": "Rozdělit rovnoměrně (50/50)",
+    "dragToResize": "Přetažením upravte velikost paměti a statistik"
 }

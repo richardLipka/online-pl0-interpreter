@@ -4,8 +4,11 @@ import {
     faStepBackward,
     faStepForward,
     faPlay,
+    faStop,
     faRedo,
+    faTachometerAlt,
 } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ButtonStyle, IconButton } from '../general/IconButton';
 import Select, { SingleValue } from 'react-select';
 import { useTranslation } from 'react-i18next';
@@ -27,9 +30,16 @@ type ControlPanelProps = {
 
     emulationState: EmulationState;
     canContinue: () => boolean;
+
+    isPlaying?: boolean;
+    stepDelay?: number;
+    onStepDelayChange?: (delay: number) => void;
 };
 export function ControlPanel(props: ControlPanelProps) {
     const { t, i18n } = useTranslation();
+
+    const isPlaying = props.isPlaying ?? false;
+    const currentDelay = props.stepDelay ?? 300;
 
     return (
         <div
@@ -55,38 +65,99 @@ export function ControlPanel(props: ControlPanelProps) {
                 <Help />
             </div>
 
-            <div>
-                <IconButton
-                    onClick={props.previous}
-                    disabled={!props.models || !props.models.length}
-                    text={t('ui:btnBack')}
-                    icon={faStepBackward}
-                    id={'back-button'}
-                />
-                <IconButton
-                    onClick={props.nextStep}
-                    disabled={!props.canContinue()}
-                    text={t('ui:btnForward')}
-                    icon={faStepForward}
-                    style={ButtonStyle.STANDARD}
-                    id={'forward-button'}
-                />
-                <IconButton
-                    onClick={props.play}
-                    disabled={!props.model}
-                    text={t('ui:btnPlay')}
-                    icon={faPlay}
-                    style={ButtonStyle.STANDARD}
-                    id={'play-button'}
-                />
-                <IconButton
-                    onClick={props.start}
-                    disabled={!props.model}
-                    text={t('ui:btnReset')}
-                    icon={faRedo}
-                    style={ButtonStyle.DANGER}
-                    id={'reset-button'}
-                />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <IconButton
+                        onClick={props.previous}
+                        disabled={isPlaying || !props.models || !props.models.length}
+                        text={t('ui:btnBack')}
+                        icon={faStepBackward}
+                        id={'back-button'}
+                    />
+                    <IconButton
+                        onClick={props.nextStep}
+                        disabled={isPlaying || !props.canContinue()}
+                        text={t('ui:btnForward')}
+                        icon={faStepForward}
+                        style={ButtonStyle.STANDARD}
+                        id={'forward-button'}
+                    />
+                    <IconButton
+                        onClick={props.play}
+                        disabled={!isPlaying && (!props.model || !props.canContinue())}
+                        text={isPlaying ? t('ui:btnStop') : t('ui:btnPlay')}
+                        icon={isPlaying ? faStop : faPlay}
+                        style={isPlaying ? ButtonStyle.DANGER : ButtonStyle.STANDARD}
+                        id={'play-button'}
+                    />
+                    <IconButton
+                        onClick={props.start}
+                        disabled={isPlaying || !props.model}
+                        text={t('ui:btnReset')}
+                        icon={faRedo}
+                        style={ButtonStyle.DANGER}
+                        id={'reset-button'}
+                    />
+                </div>
+
+                {/* Execution Speed Controller */}
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#ffffff',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FontAwesomeIcon icon={faTachometerAlt} style={{ color: '#489fb5' }} />
+                        <span style={{ fontSize: '0.85em', fontWeight: 600 }}>
+                            {t('ui:speedLabel')}:
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.75em', color: '#cbd5e0' }}>{t('ui:speedFast')}</span>
+                        <input
+                            type="range"
+                            min={20}
+                            max={1500}
+                            step={20}
+                            value={currentDelay}
+                            onChange={(e) => {
+                                if (props.onStepDelayChange) {
+                                    props.onStepDelayChange(Number(e.target.value));
+                                }
+                            }}
+                            style={{
+                                width: '110px',
+                                cursor: 'pointer',
+                                accentColor: '#489fb5',
+                            }}
+                            title={`${currentDelay} ${t('ui:msPerStep')}`}
+                        />
+                        <span style={{ fontSize: '0.75em', color: '#cbd5e0' }}>{t('ui:speedSlow')}</span>
+                    </div>
+
+                    <span
+                        style={{
+                            backgroundColor: 'rgba(72, 159, 181, 0.3)',
+                            border: '1px solid #489fb5',
+                            borderRadius: '4px',
+                            padding: '2px 6px',
+                            fontSize: '0.8em',
+                            fontWeight: 'bold',
+                            minWidth: '58px',
+                            textAlign: 'center',
+                        }}
+                    >
+                        {currentDelay} ms
+                    </span>
+                </div>
             </div>
             {
                 <div

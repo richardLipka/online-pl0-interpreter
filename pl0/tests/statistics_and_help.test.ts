@@ -244,6 +244,17 @@ describe('Instruction Help Texts & Halting Consistency', () => {
             'helpCanHaltYes',
             'helpCanHaltNo',
             'helpHaltConditions',
+            'btnStop',
+            'speedLabel',
+            'stepDelay',
+            'speedFast',
+            'speedSlow',
+            'msPerStep',
+            'swapPanels',
+            'maximizeStats',
+            'maximizeMemory',
+            'splitEvenly',
+            'dragToResize',
         ];
 
         for (const key of requiredStatKeys) {

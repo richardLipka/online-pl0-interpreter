@@ -2,11 +2,10 @@
     display: grid;
 
     grid:
-        [header-start] 'header header header header' 60px [header-end]
-        [main-start] 'instructions stack heap io' 4fr [main-end]
-        [warningline-start] 'instructions stack warnings warnings' 1fr [warningline-end]
-        [footer-start] 'footer footer footer footer' 30px [footer-end]
-        / minmax(300px, 3fr) 1fr 2fr 1fr;
+        [header-start] 'header header header' 60px [header-end]
+        [main-start] 'instructions stack memoryStats' 1fr [main-end]
+        [footer-start] 'footer footer footer' 30px [footer-end]
+        / minmax(300px, 3fr) 1fr 3fr;
 
     place-items: stretch;
     place-content: stretch;
@@ -34,12 +33,18 @@
     grid-area: instructions;
     overflow-y: auto;
 }
-.warnings {
-    grid-area: warnings;
-    overflow-y: auto;
-}
 .stack {
     grid-area: stack;
+    overflow-y: auto;
+}
+.memoryStats {
+    grid-area: memoryStats;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+}
+.warnings {
+    grid-area: warnings;
     overflow-y: auto;
 }
 .heap {

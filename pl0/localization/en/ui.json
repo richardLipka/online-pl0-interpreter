@@ -4,6 +4,7 @@
     "btnBack": "Step back",
     "btnForward": "Step forward",
     "btnPlay": "Run",
+    "btnStop": "Stop",
     "btnReset": "Reset",
     "headerInstructions": "Instructions",
     "headerStack": "Stack",
@@ -194,5 +195,16 @@
     "directive_mem": "Prints memory footprint summary (stack depth, heap data cells, active blocks, and peak total memory).",
     "directive_heap": "Prints detailed status of allocated blocks and memory addresses on the dynamic heap.",
     "directive_assert_tos": "Asserts that the top of stack equals expected value without popping it.",
-    "directive_stats": "Prints a snapshot of instruction execution and profiling statistics."
+    "directive_stats": "Prints a snapshot of instruction execution and profiling statistics.",
+
+    "speedLabel": "Execution speed",
+    "stepDelay": "Step delay",
+    "speedFast": "Fast",
+    "speedSlow": "Slow",
+    "msPerStep": "ms / step",
+    "swapPanels": "Swap panels (memory / statistics)",
+    "maximizeStats": "Enlarge statistics over memory",
+    "maximizeMemory": "Enlarge memory over statistics",
+    "splitEvenly": "Split evenly (50/50)",
+    "dragToResize": "Drag to resize memory and statistics"
 }

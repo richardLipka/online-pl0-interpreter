@@ -19,6 +19,7 @@ import { Footer } from '../components/footer';
 import { ExplainInstruction } from '../core/explainer';
 import { IO } from '../components/io';
 import { BottomPanel } from '../components/general/BottomPanel';
+import { MemoryStatsLayout } from '../components/general/MemoryStatsLayout';
 import { ControlPanel } from '../components/controlpanel';
 import {
     HeapToBeHighlighted,
@@ -57,6 +58,13 @@ const Home: NextPage = () => {
 
     const isPlayingRef = React.useRef<boolean>(false);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const [stepDelay, setStepDelay] = useState<number>(300);
+    const stepDelayRef = React.useRef<number>(300);
+
+    function handleStepDelayChange(delay: number) {
+        setStepDelay(delay);
+        stepDelayRef.current = delay;
+    }
 
     useEffect(() => {
         if (!model || model.pc >= instructions.length) {
@@ -126,7 +134,7 @@ const Home: NextPage = () => {
 
             const res = nextStep();
             if (res && !res.isEnd && isPlayingRef.current) {
-                setTimeout(runStep, 40);
+                setTimeout(runStep, stepDelayRef.current);
             } else {
                 isPlayingRef.current = false;
                 setIsPlaying(false);
@@ -272,6 +280,9 @@ const Home: NextPage = () => {
                     start={start}
                     emulationState={emulationState}
                     canContinue={ableToContinue}
+                    isPlaying={isPlaying}
+                    stepDelay={stepDelay}
+                    onStepDelayChange={handleStepDelayChange}
                 />
             </div>
             <div className={styles.instructions}>
@@ -307,33 +318,43 @@ const Home: NextPage = () => {
                             }
                         />
                     </div>
-                    <div className={styles.heap}>
-                        <Heap
-                            heap={model?.heap}
-                            heapToBeHighlighted={
-                                model == null
-                                    ? new Map<number, string>()
-                                    : HeapToBeHighlighted(
-                                          instructions[model?.pc ?? 0]?.explanationParts
-                                      )
+                    <div className={styles.memoryStats}>
+                        <MemoryStatsLayout
+                            heapComponent={
+                                <Heap
+                                    heap={model?.heap}
+                                    heapToBeHighlighted={
+                                        model == null
+                                            ? new Map<number, string>()
+                                            : HeapToBeHighlighted(
+                                                  instructions[model?.pc ?? 0]?.explanationParts
+                                              )
+                                    }
+                                    allocatorType={allocatorType}
+                                    onAllocatorChange={handleAllocatorChange}
+                                />
                             }
-                            allocatorType={allocatorType}
-                            onAllocatorChange={handleAllocatorChange}
-                        />
-                    </div>
-                    <div className={styles.io}>
-                        <IO
-                            inputTxt={inputTxt}
-                            setInputTXT={setInputTxt}
-                            outputTxt={output}
-                        />
-                    </div>
-                    <div className={styles.warnings}>
-                        <BottomPanel
-                            warnings={warnings}
-                            onClearWarnings={() => setWarnings([])}
-                            stats={model?.stats}
-                            emulationState={emulationState}
+                            ioComponent={
+                                <IO
+                                    inputTxt={inputTxt}
+                                    setInputTXT={setInputTxt}
+                                    outputTxt={output}
+                                />
+                            }
+                            renderBottomPanel={(panelProps) => (
+                                <BottomPanel
+                                    warnings={warnings}
+                                    onClearWarnings={() => setWarnings([])}
+                                    stats={model?.stats}
+                                    emulationState={emulationState}
+                                    activeTab={panelProps.activeTab}
+                                    onTabChange={panelProps.onTabChange}
+                                    onSwapPanels={panelProps.onSwapPanels}
+                                    onMaximizeStats={panelProps.onMaximizeStats}
+                                    onMaximizeMemory={panelProps.onMaximizeMemory}
+                                    onSplitEvenly={panelProps.onSplitEvenly}
+                                />
+                            )}
                         />
                     </div>
                 </>
