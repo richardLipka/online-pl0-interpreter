@@ -91,6 +91,10 @@
     "instructionsModalHeader": "Načíst/upravit instrukce",
     "btnSave": "Uložit",
     "btnCancel": "Zrušit",
+    "btnShareProgram": "Sdílet odkaz",
+    "shareUrlCopied": "Odkaz na program byl zkopírován do schránky!",
+    "programLoadedFromUrl": "Program byl úspěšně načten z URL",
+    "programUrlError": "Program zadaný v URL obsahuje chyby validace nebo syntaxe.",
 
     "instructionsTableInstruction": "Instrukce",
     "instructionsTableLevel": "Level",

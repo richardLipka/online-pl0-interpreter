@@ -6,9 +6,10 @@ import { ShowToast } from '../../utils/alerts';
 import { OKView } from '../general/OKView';
 import styles from '../../styles/instructions.module.css';
 import { ButtonStyle, IconButton } from '../general/IconButton';
-
-import { faEdit } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faShareNodes } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
+import { encodeProgramToUrl } from '../../utils/urlProgram';
+
 type InstructionsLoaderProps = {
     instructionsLoaded: (
         instructions: Instruction[],
@@ -16,16 +17,25 @@ type InstructionsLoaderProps = {
         validationErrors: PreprocessingError[]
     ) => void;
     pc: number | null;
+    initialCode?: string;
+    onCodeChange?: (code: string) => void;
+    forceOpen?: boolean;
+    onModalClose?: () => void;
+    currentInput?: string;
+    hasInstructions?: boolean;
 };
 
 export function InstructionsLoader(props: InstructionsLoaderProps) {
     const { t } = useTranslation();
     const [showModal, setShowModal] = useState(false);
 
-    const handleClose = () => setShowModal(false);
+    const handleClose = () => {
+        setShowModal(false);
+        props.onModalClose?.();
+    };
     const handleShow = () => setShowModal(true);
 
-    const [textInstructions, setTextInstructions] = useState('');
+    const [textInstructions, setTextInstructions] = useState(props.initialCode || '');
 
     const [parseOK, setParseOK] = useState(false);
     const [validationOK, setValidationOK] = useState(false);
@@ -33,6 +43,19 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
     const [validationErrors, setValidationErrors] = useState<PreprocessingError[]>([]);
 
     const [instructions, setInstructions] = useState<Instruction[] | null>(null);
+
+    useEffect(() => {
+        if (props.initialCode !== undefined && props.initialCode !== textInstructions) {
+            setTextInstructions(props.initialCode);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [props.initialCode]);
+
+    useEffect(() => {
+        if (props.forceOpen) {
+            setShowModal(true);
+        }
+    }, [props.forceOpen]);
 
     useEffect(() => {
         const pav = ParseAndValidate(textInstructions.trim());
@@ -49,6 +72,39 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
             setInstructions(null);
         }
     }, [textInstructions]);
+
+    async function handleShare() {
+        const codeToShare = (textInstructions || props.initialCode || '').trim();
+        if (!codeToShare) return;
+
+        const shareUrl = encodeProgramToUrl(
+            typeof window !== 'undefined' ? window.location.href : '',
+            codeToShare,
+            props.currentInput
+        );
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = shareUrl;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', shareUrl);
+            }
+            ShowToast(t('ui:shareUrlCopied'));
+        } catch {
+            ShowToast(t('ui:shareUrlCopied'));
+        }
+    }
 
     function ParseErrorsView() {
         return (
@@ -111,9 +167,12 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
             return;
         }
 
+        props.onCodeChange?.(textInstructions);
         props.instructionsLoaded(instructions, validationOK, validationErrors);
         handleClose();
     }
+
+    const canShare = Boolean(props.hasInstructions || (parseOK && validationOK && instructions != null));
 
     return (
         <>
@@ -127,13 +186,23 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                     marginBottom: '15px',
                 }}
             >
-                <IconButton
-                    onClick={handleShow}
-                    text={t('ui:btnLoadInstructions')}
-                    icon={faEdit}
-                    style={ButtonStyle.STANDARD}
-                    id={'load-instructions-button'}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <IconButton
+                        onClick={handleShow}
+                        text={t('ui:btnLoadInstructions')}
+                        icon={faEdit}
+                        style={ButtonStyle.STANDARD}
+                        id={'load-instructions-button'}
+                    />
+                    <IconButton
+                        onClick={handleShare}
+                        disabled={!canShare}
+                        text={t('ui:btnShareProgram')}
+                        icon={faShareNodes}
+                        style={ButtonStyle.STANDARD}
+                        id={'share-instructions-button'}
+                    />
+                </div>
                 {props.pc !== null && (
                     <div>
                         PC: <b>{props.pc}</b>
@@ -171,6 +240,15 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
+                    <Button
+                        variant="outline-info"
+                        onClick={handleShare}
+                        disabled={!(parseOK && validationOK && instructions != null)}
+                        id={'modal-share-instructions-button'}
+                        style={{ marginRight: 'auto' }}
+                    >
+                        {t('ui:btnShareProgram')}
+                    </Button>
                     <Button variant="secondary" onClick={handleClose}>
                         {t('ui:btnCancel')}
                     </Button>

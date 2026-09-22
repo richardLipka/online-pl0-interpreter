@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { Button, Modal } from 'react-bootstrap';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { InstructionsHighligting } from '../../core/highlighting';
 import { Instruction } from '../../core/model';
 import { PreprocessingError } from '../../core/validator';
 import { HeaderWrapper } from '../general/HeaderWrapper';
-import { Wrapper } from '../general/Wrapper';
 import { InstructionsLoader } from './InstructionsLoader';
 import { InstructionsTable } from './InstructionsTable';
 
@@ -21,15 +19,26 @@ type InstructionProps = {
     ) => void;
 
     instructionsToBeHighlighted: InstructionsHighligting | null;
+    initialCode?: string;
+    onCodeChange?: (code: string) => void;
+    forceOpen?: boolean;
+    onModalClose?: () => void;
+    currentInput?: string;
 };
 
 export function Instructions(props: InstructionProps) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     return (
         <HeaderWrapper header={t('ui:headerInstructions')}>
             <InstructionsLoader
                 instructionsLoaded={props.instructionsLoaded}
                 pc={props.pc}
+                initialCode={props.initialCode}
+                onCodeChange={props.onCodeChange}
+                forceOpen={props.forceOpen}
+                onModalClose={props.onModalClose}
+                currentInput={props.currentInput}
+                hasInstructions={props.instructions && props.instructions.length > 0}
             />
             <InstructionsTable
                 instructions={props.instructions}

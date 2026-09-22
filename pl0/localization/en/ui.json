@@ -91,6 +91,10 @@
     "instructionsModalHeader": "Load/Edit instructions",
     "btnSave": "Save",
     "btnCancel": "Cancel",
+    "btnShareProgram": "Share link",
+    "shareUrlCopied": "Link to program copied to clipboard!",
+    "programLoadedFromUrl": "Program successfully loaded from URL",
+    "programUrlError": "The program in the URL contains validation or syntax errors.",
 
     "instructionsTableInstruction": "Instruction",
     "instructionsTableLevel": "Level",

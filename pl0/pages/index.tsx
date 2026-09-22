@@ -12,7 +12,9 @@ import {
 } from '../core/model';
 import { InitModel, NextStep } from '../core/operations';
 import { Instructions } from '../components/instructions';
-import { PreprocessingError } from '../core/validator';
+import { ParseAndValidate, PreprocessingError } from '../core/validator';
+import { extractProgramFromUrl } from '../utils/urlProgram';
+import { ShowToast } from '../utils/alerts';
 import { Stack } from '../components/stack';
 import { Heap } from '../components/heap';
 import { Footer } from '../components/footer';
@@ -65,6 +67,50 @@ const Home: NextPage = () => {
         setStepDelay(delay);
         stepDelayRef.current = delay;
     }
+
+    const [programCode, setProgramCode] = useState<string>('');
+    const [forceOpenModal, setForceOpenModal] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const result = extractProgramFromUrl();
+        if (!result || !result.code.trim()) return;
+
+        const initialCode = result.code;
+        const initialInput = result.input ?? '';
+
+        setProgramCode(initialCode);
+
+        const pav = ParseAndValidate(initialCode.trim());
+        setValidationOK(pav.validationOK);
+        setValidationErrors(pav.validationErrors);
+
+        if (pav.parseOK && pav.validationOK && pav.instructions.length > 0) {
+            setInstructions(pav.instructions);
+
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            const m = InitModel(1024, 250, allocatorType);
+            if (initialInput) {
+                m.input = initialInput;
+                setInputTxt(initialInput);
+            } else {
+                setInputTxt('');
+            }
+            setOutputTxt('');
+            setWarnings([]);
+            setEmulationState(EmulationState.NOT_STARTED);
+            setHistory([]);
+            setModel({ ...m });
+
+            ShowToast(t('ui:programLoadedFromUrl'));
+        } else {
+            setForceOpenModal(true);
+            ShowToast(t('ui:programUrlError'), 'error');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (!model || model.pc >= instructions.length) {
@@ -299,6 +345,11 @@ const Home: NextPage = () => {
                                   instructions[model?.pc ?? 0]?.explanationParts
                               )
                     }
+                    initialCode={programCode}
+                    onCodeChange={setProgramCode}
+                    forceOpen={forceOpenModal}
+                    onModalClose={() => setForceOpenModal(false)}
+                    currentInput={inputTxt}
                 />
             </div>
 
