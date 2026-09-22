@@ -108,6 +108,14 @@ export function ParseAndValidate(input: string): ValidationResult {
     let line_counter = 0;
     let pendingPreDirectives: Directive[] = [];
     let currentInstructionIdx = 0;
+    let labels = new Map<string, number>();
+    let deferredLabels: { instructionIdx: number; rowIndex: number; label: string }[] = [];
+
+    function cleanLabel(raw: string): string {
+        let s = raw.trim();
+        if (s.endsWith(':')) s = s.slice(0, -1);
+        return s.toLowerCase();
+    }
 
     for (let i = 0; i < lines.length; i++) {
         let trimmedLine = lines[i].trim();
@@ -138,14 +146,47 @@ export function ParseAndValidate(input: string): ValidationResult {
             continue;
         }
 
-        // 3. Line contains instruction code!
+        // 3. Line contains instruction code (or label)!
         // Check if there is a trailing comment directive on this instruction line
         let trailingDir: Directive | null = null;
         if (comment && comment.startsWith('&')) {
             trailingDir = parseDirectiveText(comment, i + 1, currentInstructionIdx, 'after');
         }
 
-        let splitLine = tokenizeLine(cleanCode);
+        let tokens = tokenizeLine(cleanCode);
+        if (tokens.length === 0) {
+            continue;
+        }
+
+        // Case A: Standalone label line (e.g. "@loop" or "loop:" or "@loop:")
+        if (tokens.length === 1 && (tokens[0].startsWith('@') || tokens[0].endsWith(':'))) {
+            const lbl = cleanLabel(tokens[0]);
+            labels.set(lbl, currentInstructionIdx);
+            labels.set('@' + lbl.replace(/^@/, ''), currentInstructionIdx);
+            labels.set(lbl.replace(/^@/, ''), currentInstructionIdx);
+            continue;
+        }
+
+        // Case B: Instruction line with leading label (e.g. "@loop LOD 0 3" or "@loop: LOD 0 3" or "loop: LOD 0 3")
+        if (tokens.length >= 2 && (tokens[0].startsWith('@') || tokens[0].endsWith(':'))) {
+            const lbl = cleanLabel(tokens.shift()!);
+            labels.set(lbl, currentInstructionIdx);
+            labels.set('@' + lbl.replace(/^@/, ''), currentInstructionIdx);
+            labels.set(lbl.replace(/^@/, ''), currentInstructionIdx);
+        } else if (
+            tokens.length >= 3 &&
+            !Number.isNaN(Number(tokens[0])) &&
+            (tokens[1].startsWith('@') || tokens[1].endsWith(':'))
+        ) {
+            // Line with explicit index and label: e.g. "3 @loop LOD 0 3"
+            const explicitIndex = Number(tokens[0]);
+            const lbl = cleanLabel(tokens.splice(1, 1)[0]);
+            labels.set(lbl, explicitIndex);
+            labels.set('@' + lbl.replace(/^@/, ''), explicitIndex);
+            labels.set(lbl.replace(/^@/, ''), explicitIndex);
+        }
+
+        let splitLine = tokens;
 
         if (splitLine.length == 3) {
             splitLine.unshift((line_counter++).toString());
@@ -204,6 +245,17 @@ export function ParseAndValidate(input: string): ValidationResult {
         if (Number.isNaN(parameter)) {
             if (op.toUpperCase() === 'LIT') {
                 parameter = 0;
+            } else if (
+                parameter_str.startsWith('@') ||
+                /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(parameter_str)
+            ) {
+                // Deferred label resolution (Pass 2)
+                deferredLabels.push({
+                    instructionIdx: instructions.length,
+                    rowIndex: i,
+                    label: parameter_str,
+                });
+                parameter = 0;
             } else {
                 parseOK = false;
                 parseErrors.push({
@@ -232,6 +284,26 @@ export function ParseAndValidate(input: string): ValidationResult {
         pendingPreDirectives = [];
         currentInstructionIdx++;
         instructions.push(instruction);
+    }
+
+    // Resolve deferred label parameters (Pass 2)
+    for (const deferred of deferredLabels) {
+        const rawLabel = deferred.label;
+        const normKey = cleanLabel(rawLabel);
+        const target =
+            labels.get(normKey) ??
+            labels.get('@' + normKey.replace(/^@/, '')) ??
+            labels.get(normKey.replace(/^@/, ''));
+        if (target !== undefined) {
+            instructions[deferred.instructionIdx].parameter = target;
+            instructions[deferred.instructionIdx].parameter_str = target.toString();
+        } else {
+            parseOK = false;
+            parseErrors.push({
+                rowIndex: deferred.rowIndex,
+                error: `Neznámé návěští / Unresolved label: ${rawLabel}`,
+            });
+        }
     }
 
     // Directives after all instructions are attached as post-directives to the last instruction

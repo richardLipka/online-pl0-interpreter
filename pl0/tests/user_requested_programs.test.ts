@@ -202,4 +202,85 @@ describe('User Requested Programs - Direct Interpreter & URL Tests', () => {
             assert.strictEqual(model.stack.stackItems[3].value, 33);
         });
     });
+
+    describe('3. Symbolic Labels & Directives Execution Tests', () => {
+        // VM Exercise Example: loop with symbolic labels @loop and @konec
+        const progLabels = `INT 0  4
+       LIT 0  1
+       STO 0  3
+@loop  LOD 0  3
+       LIT 0  3
+       OPR 0 10
+       JMC 0  @konec
+       LOD 0  3
+       LIT 0  1
+       OPR 0  2
+       STO 0  3
+       JMP 0  @loop
+@konec RET 0  0`;
+
+        // VM Exercise Example: with directives &REGS, &STK, &ECHO, &STKN
+        const progDirectives = `INT 0  4
+&REGS
+&STK
+       LIT 0  1
+       STO 0  3
+@loop  LOD 0  3
+       LIT 0  3
+       OPR 0 10
+       JMC 0  @konec
+       LOD 0  3
+       LIT 0  1
+       OPR 0  2
+&ECHO hodnota a je na vrcholu zasobniku:
+&STKN 1
+       STO 0  3
+       JMP 0  @loop
+@konec RET 0  0`;
+
+        it('parses, validates and executes program with symbolic labels (@loop, @konec)', () => {
+            const pav = ParseAndValidate(progLabels);
+            assert.strictEqual(pav.parseOK, true, 'Parse should succeed');
+            assert.strictEqual(pav.validationOK, true, 'Validation should succeed');
+            assert.strictEqual(pav.instructions.length, 13);
+            
+            // Check that @konec resolved to index 12 and @loop resolved to index 3
+            assert.strictEqual(pav.instructions[6].parameter, 12, 'JMC should target @konec at index 12');
+            assert.strictEqual(pav.instructions[11].parameter, 3, 'JMP should target @loop at index 3');
+
+            const { model, isEnd } = runProgram(pav.instructions);
+            assert.strictEqual(isEnd, true, 'Program should execute to completion');
+            assert.strictEqual(model.stack.stackItems[3].value, 3, 'Variable a at slot 3 should be 3');
+        });
+
+        it('parses, validates and executes program with directives and symbolic labels', () => {
+            const pav = ParseAndValidate(progDirectives);
+            assert.strictEqual(pav.parseOK, true, 'Parse should succeed with directives and labels');
+            assert.strictEqual(pav.validationOK, true, 'Validation should succeed');
+            assert.strictEqual(pav.instructions.length, 13);
+
+            // Verify preDirectives are attached
+            assert.ok(pav.instructions[1].preDirectives.length >= 2, 'LIT 0 1 should have &REGS and &STK directives');
+            assert.ok(pav.instructions[10].preDirectives.length >= 2, 'STO 0 3 should have &ECHO and &STKN directives');
+
+            const { model, isEnd } = runProgram(pav.instructions);
+            assert.strictEqual(isEnd, true, 'Program should execute to completion');
+            assert.strictEqual(model.stack.stackItems[3].value, 3, 'Variable a at slot 3 should be 3');
+        });
+
+        it('executes program with directives & labels passed via URL query parameter', () => {
+            const url = `https://interpreter.local/pl0?code=${encodeURIComponent(progDirectives)}`;
+            const searchPart = url.substring(url.indexOf('?'));
+            const extracted = extractProgramFromUrl(searchPart);
+            assert.ok(extracted, 'Should extract code from URL');
+
+            const pav = ParseAndValidate(extracted.code);
+            assert.strictEqual(pav.parseOK, true);
+            assert.strictEqual(pav.validationOK, true);
+
+            const { model, isEnd } = runProgram(pav.instructions);
+            assert.strictEqual(isEnd, true);
+            assert.strictEqual(model.stack.stackItems[3].value, 3);
+        });
+    });
 });
