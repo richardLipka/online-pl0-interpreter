@@ -68,14 +68,14 @@ export function ControlPanel(props: ControlPanelProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <IconButton
-                        onClick={props.previous}
+                        onClick={() => props.previous()}
                         disabled={isPlaying || !props.models || !props.models.length}
                         text={t('ui:btnBack')}
                         icon={faStepBackward}
                         id={'back-button'}
                     />
                     <IconButton
-                        onClick={props.nextStep}
+                        onClick={() => props.nextStep()}
                         disabled={isPlaying || !props.canContinue()}
                         text={t('ui:btnForward')}
                         icon={faStepForward}
@@ -83,7 +83,7 @@ export function ControlPanel(props: ControlPanelProps) {
                         id={'forward-button'}
                     />
                     <IconButton
-                        onClick={props.play}
+                        onClick={() => props.play()}
                         disabled={!isPlaying && (!props.model || !props.canContinue())}
                         text={isPlaying ? t('ui:btnStop') : t('ui:btnPlay')}
                         icon={isPlaying ? faStop : faPlay}
@@ -91,7 +91,7 @@ export function ControlPanel(props: ControlPanelProps) {
                         id={'play-button'}
                     />
                     <IconButton
-                        onClick={props.start}
+                        onClick={() => props.start()}
                         disabled={isPlaying || !props.model}
                         text={t('ui:btnReset')}
                         icon={faRedo}

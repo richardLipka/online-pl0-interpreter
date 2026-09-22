@@ -13,12 +13,18 @@ export function InitModel(
     heapSize: number,
     allocatorType: AllocatorType = AllocatorType.SINGLE_LINKED
 ): DataModel {
+    const validAllocator =
+        typeof allocatorType === 'number' &&
+        (allocatorType === AllocatorType.DOUBLY_LINKED || allocatorType === AllocatorType.SINGLE_LINKED)
+            ? allocatorType
+            : AllocatorType.SINGLE_LINKED;
+
     let values: number[] = [];
     for (let i = 0; i < heapSize; i++) {
         values.push(0);
     }
 
-    const isDoubly = allocatorType === AllocatorType.DOUBLY_LINKED;
+    const isDoubly = validAllocator === AllocatorType.DOUBLY_LINKED;
     const metaSize = isDoubly ? 3 : 2;
 
     values[0] = heapSize - metaSize;
@@ -44,7 +50,7 @@ export function InitModel(
         heap: {
             size: heapSize,
             values: values,
-            allocatorType: allocatorType,
+            allocatorType: validAllocator,
             heapBlocks: [
                 {
                     blockAddress: 0,

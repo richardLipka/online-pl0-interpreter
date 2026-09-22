@@ -188,4 +188,19 @@ describe('Bug Fixes and Edge Cases', () => {
             assert.strictEqual(PutValueOnHeapDummy(model.heap, 9999), -1);
         });
     });
+
+    describe('InitModel AllocatorType Robustness (Preventing Non-Numeric / Event Objects)', () => {
+        it('safely defaults to SINGLE_LINKED when allocatorType is not a valid AllocatorType number', () => {
+            // Simulate passing an event object or invalid value (e.g. from React onClick handler)
+            const fakeEvent = { target: {}, preventDefault: () => {} } as any;
+            const modelWithEvent = InitModel(1024, 250, fakeEvent);
+            assert.strictEqual(typeof modelWithEvent.heap.allocatorType, 'number');
+            assert.strictEqual(modelWithEvent.heap.allocatorType, 0); // AllocatorType.SINGLE_LINKED
+
+            // Verify model can be serialized to JSON without circular structure issues
+            assert.doesNotThrow(() => {
+                JSON.stringify(modelWithEvent);
+            });
+        });
+    });
 });

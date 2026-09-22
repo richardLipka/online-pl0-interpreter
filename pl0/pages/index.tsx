@@ -136,10 +136,49 @@ const Home: NextPage = () => {
         start();
     }
 
+function cloneModel(m: DataModel): DataModel {
+    return {
+        pc: m.pc,
+        base: m.base,
+        sp: m.sp,
+        input: m.input,
+        output: m.output,
+        stack: {
+            maxSize: m.stack.maxSize,
+            stackItems: m.stack.stackItems.map((item) => ({ value: item.value })),
+            stackFrames: m.stack.stackFrames.map((frame) => ({ index: frame.index, size: frame.size })),
+        },
+        heap: {
+            size: m.heap.size,
+            values: [...m.heap.values],
+            allocatorType:
+                typeof m.heap.allocatorType === 'number'
+                    ? m.heap.allocatorType
+                    : AllocatorType.SINGLE_LINKED,
+            heapBlocks: m.heap.heapBlocks.map((block) => ({
+                blockAddress: block.blockAddress,
+                blockSize: block.blockSize,
+                dataAddress: block.dataAddress,
+                dataSize: block.dataSize,
+                allocatorInfoIndices: [...block.allocatorInfoIndices],
+                free: block.free,
+            })),
+        },
+        stats: m.stats
+            ? {
+                  ...m.stats,
+                  instructionCounts: { ...m.stats.instructionCounts },
+                  categoryCounts: { ...m.stats.categoryCounts },
+              }
+            : undefined,
+    };
+}
+
     function start(overrideAllocator?: AllocatorType) {
         isPlayingRef.current = false;
         setIsPlaying(false);
-        const currentAllocator = overrideAllocator ?? allocatorType;
+        const currentAllocator =
+            typeof overrideAllocator === 'number' ? overrideAllocator : allocatorType;
         const m = InitModel(1024, 250, currentAllocator);
         setEmulationState(EmulationState.NOT_STARTED);
         resetInstructionsExplanations();
@@ -209,7 +248,7 @@ const Home: NextPage = () => {
         setHistory((prev) => [
             ...prev,
             {
-                model: JSON.parse(JSON.stringify(model)),
+                model: cloneModel(model),
                 inputTxt: inputTxt,
                 output: output,
                 warnings: [...warnings],
