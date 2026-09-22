@@ -134,4 +134,10 @@ describe('URL Program Extraction & Decoding', () => {
         assert.strictEqual(pav.validationOK, true);
         assert.strictEqual(pav.instructions.length, 3);
     });
+
+    it('normalizes embedded null characters (\\0) to newlines for robustness', () => {
+        const codeWithNull = 'LIT 0, 1\u0000LIT 0, 2\u0000OPR 0, 2';
+        const normalized = normalizeNewlines(codeWithNull);
+        assert.strictEqual(normalized, 'LIT 0, 1\nLIT 0, 2\nOPR 0, 2');
+    });
 });

@@ -114,7 +114,7 @@ export function decodeProgramCode(raw: string): string {
  * Normalizes all carriage returns and line endings to single '\n'.
  */
 export function normalizeNewlines(str: string): string {
-    return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\0/g, '\n');
 }
 
 /**
