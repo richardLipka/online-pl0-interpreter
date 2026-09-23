@@ -54,6 +54,10 @@ const Home: NextPage = () => {
     const [validationOK, setValidationOK] = useState<boolean>(false);
     const [validationErrors, setValidationErrors] = useState<PreprocessingError[]>([]);
 
+    const [allocatorType, setAllocatorType] = useState<AllocatorType>(
+        AllocatorType.SINGLE_LINKED
+    );
+
     const [emulationState, setEmulationState] = useState<EmulationState>(
         EmulationState.NOT_STARTED
     );
@@ -121,9 +125,7 @@ const Home: NextPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model?.pc, inputTxt, i18n.language]);
 
-    const [allocatorType, setAllocatorType] = useState<AllocatorType>(
-        AllocatorType.SINGLE_LINKED
-    );
+
 
     function instructionsLoaded(
         instructions: Instruction[],
