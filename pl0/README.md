@@ -200,6 +200,7 @@ npx tsx cli/index.ts [options] <files.pl0 ...>
 - `-t, --trace`: Enable detailed per-step instruction trace (Step, PC, Opcode, TOS).
 - `--stats`: Output comprehensive instruction profiling and memory footprint report.
 - `--no-debug`: Disable execution of comment directives.
+- `-n, --ignore-line-numbers`: Ignore leading line numbers before instructions (strips them automatically).
 - `-f, --format <text|json>`: Output format: `text` (terminal readable) or `json` (for CI/CD automation and auto-graders).
 - `--lang <en|cs>`: Localization language for diagnostics and reports (default: `en`).
 - `-h, --help`: Display help and directive usage.

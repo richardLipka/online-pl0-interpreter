@@ -86,8 +86,121 @@ function tokenizeLine(line: string): string[] {
     return tokens;
 }
 
-export function ParseAndValidate(input: string): ValidationResult {
-    let lines = input.split(/\r?\n/);
+export function stripLineNumberFromLine(line: string): string {
+    if (!line.trim()) {
+        return line;
+    }
+
+    // 1. Line contains only a number with optional delimiter: e.g. "1" or "1:" or "1." or "[1]"
+    if (/^\s*(?:\[\d+\]|\(\d+\)|#\d+|\d+[:.)]?)\s*$/.test(line)) {
+        return '';
+    }
+
+    let result = line;
+
+    // 2. Delimited line number at start: e.g. "1: LIT 0 5", "[1] LIT 0 5", "1. LIT 0 5", "(1) LIT 0 5", "#1 LIT 0 5"
+    const delimitedMatch = result.match(/^(\s*)(?:\[\d+\]|\(\d+\)|#\d+|\d+[:.)])\s*(.*)$/);
+    if (delimitedMatch) {
+        result = `${delimitedMatch[1]}${delimitedMatch[2]}`;
+    } else {
+        // 3. Plain integer followed by instruction mnemonic / directive / label / comment:
+        // e.g. "0 LIT 0 5", "1 INT 0 3", "1 @loop", "1 ; comment", "1 &REGS"
+        const plainMatch = result.match(/^(\s*)\d+\s+(?=[a-zA-Z_@;&/])(.*)$/);
+        if (plainMatch) {
+            result = `${plainMatch[1]}${plainMatch[2]}`;
+        }
+    }
+
+    // 4. Line number following a leading label: e.g. "@loop: 1 LOD 0 3" or "@loop: 1: LOD 0 3"
+    const labelNumMatch = result.match(
+        /^(\s*(?:@\w+:?|[a-zA-Z_]\w*:)\s+)(?:\[\d+\]|\(\d+\)|#\d+|\d+[:.)]\s*|\d+\s+(?=[a-zA-Z_@;&/]))(.*)$/
+    );
+    if (labelNumMatch) {
+        result = `${labelNumMatch[1]}${labelNumMatch[2]}`;
+    }
+
+    return result;
+}
+
+export function stripLineNumbers(input: string): string {
+    if (!input) return input;
+    const lineEnding = input.includes('\r\n') ? '\r\n' : '\n';
+    return input
+        .split(/\r?\n/)
+        .map((line) => stripLineNumberFromLine(line))
+        .join(lineEnding);
+}
+
+export function hasLineNumbers(input: string): boolean {
+    if (!input || !input.trim()) return false;
+    const lines = input.split(/\r?\n/);
+    return lines.some((line) => {
+        if (!line.trim()) return false;
+        return stripLineNumberFromLine(line) !== line;
+    });
+}
+
+export function isInstructionLine(line: string): boolean {
+    const { code } = stripComment(line);
+    const cleanCode = code.trim();
+    if (!cleanCode || cleanCode.startsWith('&')) {
+        return false;
+    }
+    const tokens = tokenizeLine(cleanCode);
+    if (tokens.length === 0) {
+        return false;
+    }
+    if (tokens.length === 1 && (tokens[0].startsWith('@') || tokens[0].endsWith(':'))) {
+        return false;
+    }
+    if (stringInstructionMap.has(tokens[0].toUpperCase())) {
+        return true;
+    }
+    if (
+        tokens.length >= 2 &&
+        (tokens[0].startsWith('@') || tokens[0].endsWith(':')) &&
+        stringInstructionMap.has(tokens[1].toUpperCase())
+    ) {
+        return true;
+    }
+    return false;
+}
+
+export function addLineNumbers(input: string): string {
+    if (!input) return input;
+    const lineEnding = input.includes('\r\n') ? '\r\n' : '\n';
+    const lines = input.split(/\r?\n/);
+    let instructionIndex = 0;
+
+    const resultLines = lines.map((line) => {
+        const stripped = stripLineNumberFromLine(line);
+        if (!stripped.trim()) {
+            return stripped;
+        }
+
+        if (isInstructionLine(stripped)) {
+            const indentMatch = stripped.match(/^(\s*)(.*)$/);
+            const indent = indentMatch ? indentMatch[1] : '';
+            const content = indentMatch ? indentMatch[2] : stripped;
+            return `${indent}${instructionIndex++} ${content}`;
+        }
+
+        return stripped;
+    });
+
+    return resultLines.join(lineEnding);
+}
+
+export interface ParseAndValidateOptions {
+    ignoreLineNumbers?: boolean;
+}
+
+export function ParseAndValidate(
+    input: string,
+    options?: ParseAndValidateOptions
+): ValidationResult {
+    const rawInput = options?.ignoreLineNumbers ? stripLineNumbers(input) : input;
+    let lines = rawInput.split(/\r?\n/);
 
     if (lines.length == 1 && lines[0].trim() == '') {
         return {

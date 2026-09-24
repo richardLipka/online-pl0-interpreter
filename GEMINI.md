@@ -101,6 +101,7 @@ Supported options:
 - `-t, --trace`: Step-by-step execution trace (PC, mnemonic, operands, top of stack).
 - `--stats`: Print instruction frequency profiling, branch statistics, and memory usage.
 - `--no-debug`: Disable execution of comment directives.
+- `-n, --ignore-line-numbers`: Ignore leading line numbers before instructions (strips them automatically).
 - `-f, --format <text|json>`: Formats output as human-readable text or structured JSON for automated grading and CI/CD pipelines.
 - `--lang <en|cs>`: Localization language for diagnostics and messages (default: `en`).
 - `-h, --help`: CLI syntax and directive documentation.

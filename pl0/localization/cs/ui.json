@@ -95,6 +95,13 @@
     "shareUrlCopied": "Odkaz na program byl zkopírován do schránky!",
     "programLoadedFromUrl": "Program byl úspěšně načten z URL",
     "programUrlError": "Program zadaný v URL obsahuje chyby validace nebo syntaxe.",
+    "btnStripLineNumbers": "Vymazat čísla",
+    "btnStripLineNumbersTooltip": "Odstraní čísla řádek z počátku každého řádku instrukcí",
+    "btnNumberLines": "Očíslovat",
+    "btnNumberLinesTooltip": "Doplní indexy (čísla) instrukcí od 0 na začátek každého řádku instrukce",
+    "lineNumbersDetectedNotice": "Před instrukcemi byla detekována čísla řádek, která mohou způsobit chybu validace.",
+    "lineNumbersRemoved": "Čísla řádek byla odstraněna.",
+    "lineNumbersAdded": "Instrukce byly očíslovány.",
 
     "instructionsTableInstruction": "Instrukce",
     "instructionsTableLevel": "Level",

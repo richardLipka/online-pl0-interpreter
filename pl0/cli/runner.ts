@@ -1,4 +1,4 @@
-import { ParseAndValidate } from '../core/validator';
+import { ParseAndValidate, hasLineNumbers } from '../core/validator';
 import { InitModel, NextStep } from '../core/operations';
 import { InstructionType, ExecutionStatistics } from '../core/model';
 import i18next from 'i18next';
@@ -27,6 +27,7 @@ export interface CliOptions {
     format?: 'text' | 'json';
     language?: 'en' | 'cs';
     filePath?: string;
+    ignoreLineNumbers?: boolean;
 }
 
 export interface AssertionSummary {
@@ -62,11 +63,21 @@ export function runHeadless(sourceCode: string, options: CliOptions = {}): CliRu
     const enableTrace = options.trace ?? false;
     const initialInput = options.input ?? '';
 
-    const parseResult = ParseAndValidate(sourceCode);
+    const parseResult = ParseAndValidate(sourceCode, {
+        ignoreLineNumbers: options.ignoreLineNumbers,
+    });
     if (!parseResult.parseOK || !parseResult.validationOK) {
-        const errors = [...parseResult.parseErrors, ...parseResult.validationErrors]
+        let errors = [...parseResult.parseErrors, ...parseResult.validationErrors]
             .map((e) => `Line ${e.rowIndex + 1}: ${e.error}`)
             .join('; ');
+
+        if (!options.ignoreLineNumbers && hasLineNumbers(sourceCode)) {
+            const hint =
+                lang === 'cs'
+                    ? ' (Tip: Byla detekována čísla řádek. Pro jejich ignorování můžete použít přepínač --ignore-line-numbers)'
+                    : ' (Hint: Line numbers detected before instructions. You can use the --ignore-line-numbers flag)';
+            errors += hint;
+        }
 
         return {
             filePath: options.filePath,

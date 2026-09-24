@@ -95,6 +95,13 @@
     "shareUrlCopied": "Link to program copied to clipboard!",
     "programLoadedFromUrl": "Program successfully loaded from URL",
     "programUrlError": "The program in the URL contains validation or syntax errors.",
+    "btnStripLineNumbers": "Remove line numbers",
+    "btnStripLineNumbersTooltip": "Remove line numbers from the beginning of each instruction line",
+    "btnNumberLines": "Number lines",
+    "btnNumberLinesTooltip": "Add instruction indices (numbers) starting from 0 to each instruction line",
+    "lineNumbersDetectedNotice": "Line numbers were detected before instructions, which may cause validation errors.",
+    "lineNumbersRemoved": "Line numbers were removed.",
+    "lineNumbersAdded": "Instructions have been numbered.",
 
     "instructionsTableInstruction": "Instruction",
     "instructionsTableLevel": "Level",

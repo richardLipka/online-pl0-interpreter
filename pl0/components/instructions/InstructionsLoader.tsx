@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { Instruction } from '../../core/model';
-import { ParseAndValidate, PreprocessingError } from '../../core/validator';
+import { ParseAndValidate, PreprocessingError, hasLineNumbers, stripLineNumbers, addLineNumbers } from '../../core/validator';
 import { ShowToast } from '../../utils/alerts';
 import { OKView } from '../general/OKView';
 import styles from '../../styles/instructions.module.css';
 import { ButtonStyle, IconButton } from '../general/IconButton';
-import { faEdit, faShareNodes } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faShareNodes, faEraser, faExclamationTriangle, faListOl } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useTranslation } from 'react-i18next';
 import { encodeProgramToUrl } from '../../utils/urlProgram';
 
@@ -173,6 +174,46 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
     }
 
     const canShare = Boolean(props.hasInstructions || (parseOK && validationOK && instructions != null));
+    const lineNumbersPresent = hasLineNumbers(textInstructions);
+    const hasInstructionsCode = textInstructions.trim().length > 0;
+    const initialOrTextHasLineNumbers = hasLineNumbers(props.initialCode || textInstructions);
+    const initialOrTextHasCode = (props.initialCode || textInstructions).trim().length > 0;
+
+    function handleStripLineNumbers() {
+        const cleaned = stripLineNumbers(textInstructions);
+        setTextInstructions(cleaned);
+        ShowToast(t('ui:lineNumbersRemoved'));
+    }
+
+    function handleAddLineNumbers() {
+        const numbered = addLineNumbers(textInstructions);
+        setTextInstructions(numbered);
+        ShowToast(t('ui:lineNumbersAdded'));
+    }
+
+    function handleQuickStrip() {
+        const source = props.initialCode || textInstructions;
+        const cleaned = stripLineNumbers(source);
+        setTextInstructions(cleaned);
+        props.onCodeChange?.(cleaned);
+        const pav = ParseAndValidate(cleaned.trim());
+        if (pav.parseOK && pav.validationOK && pav.instructions.length > 0) {
+            props.instructionsLoaded(pav.instructions, pav.validationOK, pav.validationErrors);
+        }
+        ShowToast(t('ui:lineNumbersRemoved'));
+    }
+
+    function handleQuickNumber() {
+        const source = props.initialCode || textInstructions;
+        const numbered = addLineNumbers(source);
+        setTextInstructions(numbered);
+        props.onCodeChange?.(numbered);
+        const pav = ParseAndValidate(numbered.trim());
+        if (pav.parseOK && pav.validationOK && pav.instructions.length > 0) {
+            props.instructionsLoaded(pav.instructions, pav.validationOK, pav.validationErrors);
+        }
+        ShowToast(t('ui:lineNumbersAdded'));
+    }
 
     return (
         <>
@@ -202,6 +243,25 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                         style={ButtonStyle.STANDARD}
                         id={'share-instructions-button'}
                     />
+                    {initialOrTextHasLineNumbers ? (
+                        <IconButton
+                            onClick={handleQuickStrip}
+                            text={t('ui:btnStripLineNumbers')}
+                            icon={faEraser}
+                            style={ButtonStyle.STANDARD}
+                            id={'quick-strip-instructions-button'}
+                        />
+                    ) : (
+                        initialOrTextHasCode && (
+                            <IconButton
+                                onClick={handleQuickNumber}
+                                text={t('ui:btnNumberLines')}
+                                icon={faListOl}
+                                style={ButtonStyle.STANDARD}
+                                id={'quick-number-instructions-button'}
+                            />
+                        )
+                    )}
                 </div>
                 {props.pc !== null && (
                     <div>
@@ -221,7 +281,68 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                     <Modal.Title>{t('ui:instructionsModalHeader')}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <input type="file" onChange={onFileAdded} />
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '10px',
+                            flexWrap: 'wrap',
+                            gap: '8px',
+                        }}
+                    >
+                        <input type="file" onChange={onFileAdded} />
+                        {lineNumbersPresent ? (
+                            <Button
+                                variant="outline-warning"
+                                size="sm"
+                                onClick={handleStripLineNumbers}
+                                id="strip-line-numbers-button"
+                                title={t('ui:btnStripLineNumbersTooltip')}
+                            >
+                                <FontAwesomeIcon icon={faEraser} style={{ marginRight: '6px' }} />
+                                {t('ui:btnStripLineNumbers')}
+                            </Button>
+                        ) : (
+                            hasInstructionsCode && (
+                                <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={handleAddLineNumbers}
+                                    id="add-line-numbers-button"
+                                    title={t('ui:btnNumberLinesTooltip')}
+                                >
+                                    <FontAwesomeIcon icon={faListOl} style={{ marginRight: '6px' }} />
+                                    {t('ui:btnNumberLines')}
+                                </Button>
+                            )
+                        )}
+                    </div>
+
+                    {lineNumbersPresent && (
+                        <div
+                            className="alert alert-warning d-flex justify-content-between align-items-center py-2 px-3 mb-2"
+                            style={{ fontSize: '0.9rem' }}
+                            id="line-numbers-detected-alert"
+                        >
+                            <span>
+                                <FontAwesomeIcon
+                                    icon={faExclamationTriangle}
+                                    style={{ marginRight: '8px' }}
+                                />
+                                {t('ui:lineNumbersDetectedNotice')}
+                            </span>
+                            <Button
+                                variant="warning"
+                                size="sm"
+                                onClick={handleStripLineNumbers}
+                                id="strip-line-numbers-alert-button"
+                            >
+                                <FontAwesomeIcon icon={faEraser} style={{ marginRight: '6px' }} />
+                                {t('ui:btnStripLineNumbers')}
+                            </Button>
+                        </div>
+                    )}
 
                     <div style={{}}>
                         <textarea

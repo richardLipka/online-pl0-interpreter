@@ -19,6 +19,7 @@ Přepínače:
   -t, --trace                 Zapne podrobný trasovací výpis každé provedené instrukce
   --stats                     Vypíše souhrnné statistiky běhu a profilování instrukcí
   --no-debug                  Vypne provádění ladicích direktiv v komentářích
+  -n, --ignore-line-numbers   Ignoruje čísla řádek před instrukcemi (automaticky je odstraní před překladem)
   -f, --format <text|json>    Formát výstupu: 'text' (přehledný pro terminál) nebo 'json' (pro CI/CD)
   --lang <cs|en>              Jazyk chybových zpráv a popisků (výchozí: en)
   -h, --help                  Zobrazí tuto nápovědu a seznam direktiv
@@ -41,6 +42,7 @@ Direktivy v komentářích pro ladění a testování:
 Příklady:
   npx tsx cli/index.ts program.pl0
   npx tsx cli/index.ts program.pl0 -i "42" --stats
+  npx tsx cli/index.ts program.pl0 --ignore-line-numbers
   npx tsx cli/index.ts test1.pl0 test2.pl0 --format json
 `);
     } else {
@@ -58,6 +60,7 @@ Options:
   -t, --trace                 Enable per-step execution trace (shows step, PC, opcode, TOS)
   --stats                     Display execution statistics and instruction profiling breakdown
   --no-debug                  Disable execution of comment directives
+  -n, --ignore-line-numbers   Ignore line numbers before instructions (automatically strips them before parsing)
   -f, --format <text|json>    Output format: 'text' (terminal friendly) or 'json' (for automated CI/CD)
   --lang <en|cs>              Language for messages and diagnostics (default: en)
   -h, --help                  Display this help message and directive documentation
@@ -131,6 +134,13 @@ async function main() {
             options.enableDirectives = false;
         } else if (arg === '-d' || arg === '--debug') {
             options.enableDirectives = true;
+        } else if (
+            arg === '-n' ||
+            arg === '--ignore-line-numbers' ||
+            arg === '--strip-line-numbers' ||
+            arg === '--no-line-numbers'
+        ) {
+            options.ignoreLineNumbers = true;
         } else if (arg === '-f' || arg === '--format') {
             const fmt = args[++i];
             if (fmt === 'json' || fmt === 'text') {
