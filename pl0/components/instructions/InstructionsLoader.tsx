@@ -319,32 +319,7 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                         )}
                     </div>
 
-                    {lineNumbersPresent && (
-                        <div
-                            className="alert alert-warning d-flex justify-content-between align-items-center py-2 px-3 mb-2"
-                            style={{ fontSize: '0.9rem' }}
-                            id="line-numbers-detected-alert"
-                        >
-                            <span>
-                                <FontAwesomeIcon
-                                    icon={faExclamationTriangle}
-                                    style={{ marginRight: '8px' }}
-                                />
-                                {t('ui:lineNumbersDetectedNotice')}
-                            </span>
-                            <Button
-                                variant="warning"
-                                size="sm"
-                                onClick={handleStripLineNumbers}
-                                id="strip-line-numbers-alert-button"
-                            >
-                                <FontAwesomeIcon icon={faEraser} style={{ marginRight: '6px' }} />
-                                {t('ui:btnStripLineNumbers')}
-                            </Button>
-                        </div>
-                    )}
-
-                    <div style={{}}>
+                    <div>
                         <textarea
                             style={{ width: '100%' }}
                             rows={15}
@@ -354,9 +329,66 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
                             id={'instructions-textarea'}
                         />
 
-                        <div>
-                            <ParseErrorsView />
-                            {parseOK && <ValidationErrorsView />}
+                        <div
+                            style={{
+                                marginTop: '10px',
+                                display: 'flex',
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                gap: '15px',
+                                flexWrap: 'wrap',
+                            }}
+                        >
+                            <div style={{ flex: '1 1 260px' }}>
+                                <ParseErrorsView />
+                                {parseOK && <ValidationErrorsView />}
+                            </div>
+
+                            {lineNumbersPresent && (
+                                <div
+                                    id="line-numbers-detected-alert"
+                                    className="alert alert-warning py-1 px-2 mb-0 d-inline-flex align-items-center"
+                                    style={{
+                                        fontSize: '0.8rem',
+                                        lineHeight: '1.25',
+                                        gap: '8px',
+                                        flex: '0 1 auto',
+                                        maxWidth: '430px',
+                                        borderRadius: '5px',
+                                    }}
+                                >
+                                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                                        <FontAwesomeIcon
+                                            icon={faExclamationTriangle}
+                                            style={{
+                                                marginRight: '6px',
+                                                flexShrink: 0,
+                                                fontSize: '0.85rem',
+                                            }}
+                                        />
+                                        <span>{t('ui:lineNumbersDetectedNotice')}</span>
+                                    </span>
+                                    <Button
+                                        variant="warning"
+                                        size="sm"
+                                        onClick={handleStripLineNumbers}
+                                        id="strip-line-numbers-alert-button"
+                                        style={{
+                                            fontSize: '0.75rem',
+                                            padding: '2px 7px',
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faEraser}
+                                            style={{ marginRight: '4px' }}
+                                        />
+                                        {t('ui:btnStripLineNumbers')}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Modal.Body>
