@@ -260,8 +260,8 @@ describe('User Requested Programs - Direct Interpreter & URL Tests', () => {
             assert.strictEqual(pav.instructions.length, 13);
 
             // Verify preDirectives are attached
-            assert.ok(pav.instructions[1].preDirectives.length >= 2, 'LIT 0 1 should have &REGS and &STK directives');
-            assert.ok(pav.instructions[10].preDirectives.length >= 2, 'STO 0 3 should have &ECHO and &STKN directives');
+            assert.ok((pav.instructions[1].preDirectives ?? []).length >= 2, 'LIT 0 1 should have &REGS and &STK directives');
+            assert.ok((pav.instructions[10].preDirectives ?? []).length >= 2, 'STO 0 3 should have &ECHO and &STKN directives');
 
             const { model, isEnd } = runProgram(pav.instructions);
             assert.strictEqual(isEnd, true, 'Program should execute to completion');

@@ -21,7 +21,7 @@ Strictly **bilingual (Czech and English)** with complete localization parity.
 
 ## Quick Start
 
-All project code, tests, and CLI entry points are located in the [`pl0/`](file:///f:/Vyvoj/AI/PL0/pl0) directory.
+All project code, tests, and CLI entry points are located in the [`pl0/`](pl0) directory.
 
 ```bash
 # Navigate to the project directory
@@ -33,7 +33,7 @@ npm install
 # Start local interactive web application (http://localhost:3000)
 npm run dev
 
-# Run automated test suite (140+ unit tests)
+# Run automated test suite
 npm test
 
 # Run headless CLI interpreter
@@ -76,7 +76,7 @@ Directives allow students and testing scripts to inspect virtual machine state d
 | `&ECHO <text>` | Print arbitrary debugging message or marker. |
 | `&MEM` | Print stack and heap memory footprint. |
 | `&HEAP` | Dump active heap blocks and allocated data. |
-| `&ASSERT_TOS <val>` | Assert that top-of-stack equals `<val>` without popping. Halts if mismatch. |
+| `&ASSERT_TOS <val>` | Assert that top-of-stack equals `<val>` without popping. A mismatch is reported as `[ASSERTION FAIL ...]` (CLI exit code 1); execution continues. |
 | `&STATS` | Output snapshot of execution profiling counters. |
 
 Directives stream directly to standard output (`model.output` in GUI and terminal stdout in CLI) without altering calculation state.
@@ -85,15 +85,15 @@ Directives stream directly to standard output (`model.output` in GUI and termina
 
 ## Repository Structure
 
-- [`pl0/`](file:///f:/Vyvoj/AI/PL0/pl0): Web application & CLI root
-  - [`pl0/cli/`](file:///f:/Vyvoj/AI/PL0/pl0/cli): Headless CLI runner (`index.ts`, `runner.ts`)
-  - [`pl0/core/`](file:///f:/Vyvoj/AI/PL0/pl0/core): VM engine (`model.ts`, `directives.ts`, `allocator.ts`, `explainer.ts`, `validator.ts`)
-  - [`pl0/components/`](file:///f:/Vyvoj/AI/PL0/pl0/components): UI components (Instructions, Stack, Heap, Controls, Statistics, Help)
-  - [`pl0/localization/`](file:///f:/Vyvoj/AI/PL0/pl0/localization): Bilingual dictionaries (`cs` and `en`)
-  - [`pl0/tests/`](file:///f:/Vyvoj/AI/PL0/pl0/tests): Automated unit tests (140+ test cases)
-  - [`pl0/pages/`](file:///f:/Vyvoj/AI/PL0/pl0/pages): Next.js entry points
-- [`GEMINI.md`](file:///f:/Vyvoj/AI/PL0/GEMINI.md): Project specification, ISA details, and design guidelines
-- [`pl0/README.md`](file:///f:/Vyvoj/AI/PL0/pl0/README.md): Detailed technical documentation, VM internals, and component architecture
+- [`pl0/`](pl0): Web application & CLI root
+  - [`pl0/cli/`](pl0/cli): Headless CLI runner (`index.ts`, `runner.ts`)
+  - [`pl0/core/`](pl0/core): VM engine (`model.ts`, `directives.ts`, `allocator.ts`, `explainer.ts`, `validator.ts`)
+  - [`pl0/components/`](pl0/components): UI components (Instructions, Stack, Heap, Controls, Statistics, Help)
+  - [`pl0/localization/`](pl0/localization): Bilingual dictionaries (`cs` and `en`)
+  - [`pl0/tests/`](pl0/tests): Automated unit tests
+  - [`pl0/pages/`](pl0/pages): Next.js entry points
+- [`GEMINI.md`](GEMINI.md): Project specification, ISA details, and design guidelines
+- [`pl0/README.md`](pl0/README.md): Detailed technical documentation, VM internals, and component architecture
 
 ---
 

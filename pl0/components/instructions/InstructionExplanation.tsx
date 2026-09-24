@@ -17,10 +17,8 @@ function ExplanationPart({
         const replacement = String(part.placeholder.value ?? '');
         return (
             <span style={isNext ? { backgroundColor: part.color ?? 'white' } : {}}>
-                {part.content.replace(
-                    part.placeholder.placeholder,
-                    replacement
-                )}
+                {/* a replacer function keeps '$' in values from being treated as a replacement pattern */}
+                {part.content.replace(part.placeholder.placeholder, () => replacement)}
             </span>
         );
     }

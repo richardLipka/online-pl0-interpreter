@@ -11,7 +11,7 @@ An interactive stack architecture CPU simulator and headless verification tool f
    - [Extended Heap Instructions](#2-extended-instructions-heap-manipulation)
    - [Extended Pointer Instructions](#3-extended-instructions-pointers--indirect-addressing)
    - [Extended String & I/O Instructions](#4-extended-instructions-strings--character-io)
-   - [Extended Floating-Point Instructions](#5-extended-instructions-floating-point--interrupts)
+   - [Extended Floating-Point Instructions](#5-extended-instructions-floating-point)
    - [Division by Zero Hardware Semantics](#6-division-by-zero-hardware-semantics)
 3. [Comment Directives for Debugging](#comment-directives-for-debugging)
 4. [Headless CLI Testing Environment](#headless-cli-testing-environment)
@@ -70,8 +70,8 @@ npm run export
 | **`LIT`** | `0` | `value` | No | Pushes literal constant `value` onto the stack top. Also supports string literals (e.g. `LIT 0, "hello"`). |
 | **`INT`** | `0` | `offset` | Yes | Increments the stack pointer `sp` by `offset` to allocate or deallocate local variable space in the current frame. |
 | **`OPR`** | `0` | `operation` | Yes | Executes arithmetic, relational, or logical operation `operation` on stack operands. Halts on divide/modulo by zero or insufficient operands. |
-| **`LOD`** | `L` | `offset` | Yes | Loads variable from lexical scope difference `L` and relative address `offset` onto the stack. |
-| **`STO`** | `L` | `offset` | Yes | Pops top of stack and stores it into variable at lexical scope difference `L` and relative address `offset`. |
+| **`LOD`** | `L` | `offset` | Yes | Loads variable from lexical scope difference `L` and relative address `offset` onto the stack. A negative `offset` (e.g. `LOD 0, -1` reading an argument pushed by the caller) reaches below the frame base; it works but logs a soft warning. |
+| **`STO`** | `L` | `offset` | Yes | Pops top of stack and stores it into variable at lexical scope difference `L` and relative address `offset`. A negative `offset` works like in `LOD` and logs a soft warning. |
 | **`CAL`** | `L` | `address` | Yes | Calls procedure at instruction index `address`. Sets up activation record with Static Link (resolved across `L` scopes), Dynamic Link, and return `PC`. |
 | **`RET`** | `0` | `0` | Yes | Returns from current procedure, pops the activation record, and restores caller's `base` and `PC`. |
 | **`JMP`** | `0` | `address` | Yes | Unconditional jump to instruction index `address`. |
@@ -83,8 +83,8 @@ npm run export
 - `2`: Addition (`+`)
 - `3`: Subtraction (`-`)
 - `4`: Multiplication (`*`)
-- `5`: Integer Division (`/`) — *halts on division by zero*
-- `6`: Modulo (`%`) — *halts on modulo by zero*
+- `5`: Integer Division (`/`, rounded towards zero, e.g. `-7 / 2 = -3`) — *halts on division by zero*
+- `6`: Modulo (`%`, the result has the sign of the dividend, e.g. `-7 % 2 = -1`) — *halts on modulo by zero*
 - `7`: Odd check (`TOS % 2 != 0`)
 - `8`: Equality check (`==`)
 - `9`: Non-equality check (`!=`)
@@ -125,12 +125,12 @@ npm run export
 
 ---
 
-### 5. Extended Instructions: Floating-Point & Interrupts
+### 5. Extended Instructions: Floating-Point
 
 | Instruction | Level (L) | Parameter (A) | Halts on Error? | Description |
 | :--- | :---: | :---: | :---: | :--- |
-| **`ITR`** | `0` | `0` | Yes | Converts integer components on stack to real (floating-point) representation. |
-| **`RTI`** | `0` | `param` | Yes | Converts real to integer representation, or returns from interrupt. |
+| **`ITR`** | `0` | `0` | Yes | Converts the whole part (`SP - 1`) and the fractional part (TOS) to a real number (exponent, mantissa on TOS). Leading zeros of the fractional part are significant: `LIT 0, 3` + `LIT 0, 05` is 3.05. |
+| **`RTI`** | `0` | `0` or `1` | Yes | Converts a real number (exponent, mantissa on TOS) to integers: `RTI 0, 0` pushes the whole and the fractional part, `RTI 0, 1` only the whole part (truncated towards zero). |
 | **`OPF`** | `0` | `operation` | Yes | Executes floating-point operation on stack operands (add, sub, mul, div, mod, comparisons). |
 
 ---
@@ -176,7 +176,7 @@ STO 0, 4  // &ASSERT_TOS 42
 | **`&ECHO`** | `<text>` | Outputs arbitrary debugging message to output stream. |
 | **`&MEM`** | — | Outputs memory footprint: stack depth, active heap cells, and block counts. |
 | **`&HEAP`** | — | Dumps detailed state and data contents of all active heap blocks. |
-| **`&ASSERT_TOS`** | `<expected>` | Verifies top-of-stack equals `<expected>` without popping. Halts if mismatch. |
+| **`&ASSERT_TOS`** | `<expected>` | Verifies top-of-stack equals `<expected>` without popping. A mismatch is reported as `[ASSERTION FAIL ...]` and execution continues. |
 | **`&STATS`** | — | Outputs snapshot of instruction profiling counters and cycle counts. |
 
 Directives stream directly to standard output (`model.output` in GUI and stdout in CLI).
@@ -211,7 +211,7 @@ npx tsx cli/index.ts [options] <files.pl0 ...>
 npm run cli -- test1.pl0 test2.pl0 -f json
 ```
 
-Exit code is `0` when all programs execute successfully, or `1` if any program halts with an unhandled exception or assertion failure.
+Exit code is `0` when all programs execute successfully, `1` if any program halts on a runtime error or an assertion fails, `2` on a validation error or a missing file and `3` when the step limit is reached.
 
 ---
 
@@ -312,6 +312,7 @@ npm test
 - `warnings_unexpected_operations.test.ts`: Hardware-realistic division by zero, memory boundary warnings, jumping to empty memory.
 - `cli_and_directives.test.ts`: Headless CLI options, comment directives (`&REGS`, `&STK`, `&ASSERT_TOS`, etc.), text/JSON report generation.
 - `statistics_and_help.test.ts`: Profiling metrics, instruction halting tags, bilingual localization parity.
+- `review_fixes.test.ts`: Regression tests for integer division, real number conversions, localized runtime errors, validator line numbers and labels, explanations and program links.
 - `programs.test.ts`: Complete PL/0 demo programs (Factorial iterative/recursive, Fibonacci, Euclidean GCD, String stream processing, Linked list on heap).
 
 ---

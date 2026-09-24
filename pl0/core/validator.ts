@@ -62,10 +62,12 @@ export let instructionStringMap = new Map<InstructionType, string>([
     [InstructionType.OPF, 'OPF'],
 ]);
 
+// Splits a line into tokens; whitespace and commas outside quotes separate tokens,
+// so "LIT 0 5", "LIT 0, 5" and "LIT 0,5" are equivalent
 function tokenizeLine(line: string): string[] {
     const trimmed = line.trim();
     if (!trimmed) return [];
-    const regex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+    const regex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|([^\s,]+)/g;
     const tokens: string[] = [];
     let match;
     while ((match = regex.exec(trimmed)) !== null) {
@@ -74,13 +76,7 @@ function tokenizeLine(line: string): string[] {
         } else if (match[2] !== undefined) {
             tokens.push(match[2]);
         } else if (match[3] !== undefined) {
-            let tok = match[3];
-            if (tok.endsWith(',')) {
-                tok = tok.slice(0, -1);
-            }
-            if (tok.length > 0) {
-                tokens.push(tok);
-            }
+            tokens.push(match[3]);
         }
     }
     return tokens;
@@ -202,7 +198,7 @@ export function ParseAndValidate(
     const rawInput = options?.ignoreLineNumbers ? stripLineNumbers(input) : input;
     let lines = rawInput.split(/\r?\n/);
 
-    if (lines.length == 1 && lines[0].trim() == '') {
+    if (rawInput.trim() == '') {
         return {
             emptyInput: true,
             validationOK: false,
@@ -216,6 +212,8 @@ export function ParseAndValidate(
     let parseOK = true;
     let validationOK = true;
     let instructions: Instruction[] = [];
+    // Source line (0-based) of every instruction, so that validation errors point to the right line
+    let instructionLines: number[] = [];
     let validationErrors: PreprocessingError[] = [];
     let parseErrors: PreprocessingError[] = [];
     let line_counter = 0;
@@ -228,6 +226,23 @@ export function ParseAndValidate(
         let s = raw.trim();
         if (s.endsWith(':')) s = s.slice(0, -1);
         return s.toLowerCase();
+    }
+
+    // "@loop", "loop:" and "@loop:" all define the same label
+    function defineLabel(raw: string, target: number, rowIndex: number) {
+        const lbl = cleanLabel(raw);
+        const bare = lbl.replace(/^@/, '');
+        if (labels.has(bare)) {
+            parseOK = false;
+            parseErrors.push({
+                rowIndex: rowIndex,
+                error: String(i18next.t('core:validatorDuplicateLabel')).replace('%1', raw),
+            });
+            return;
+        }
+        labels.set(lbl, target);
+        labels.set('@' + bare, target);
+        labels.set(bare, target);
     }
 
     for (let i = 0; i < lines.length; i++) {
@@ -273,19 +288,18 @@ export function ParseAndValidate(
 
         // Case A: Standalone label line (e.g. "@loop" or "loop:" or "@loop:")
         if (tokens.length === 1 && (tokens[0].startsWith('@') || tokens[0].endsWith(':'))) {
-            const lbl = cleanLabel(tokens[0]);
-            labels.set(lbl, currentInstructionIdx);
-            labels.set('@' + lbl.replace(/^@/, ''), currentInstructionIdx);
-            labels.set(lbl.replace(/^@/, ''), currentInstructionIdx);
+            defineLabel(tokens[0], currentInstructionIdx, i);
+            // A directive in the comment of a label line belongs before the labelled instruction
+            if (trailingDir) {
+                trailingDir.position = 'before';
+                pendingPreDirectives.push(trailingDir);
+            }
             continue;
         }
 
         // Case B: Instruction line with leading label (e.g. "@loop LOD 0 3" or "@loop: LOD 0 3" or "loop: LOD 0 3")
         if (tokens.length >= 2 && (tokens[0].startsWith('@') || tokens[0].endsWith(':'))) {
-            const lbl = cleanLabel(tokens.shift()!);
-            labels.set(lbl, currentInstructionIdx);
-            labels.set('@' + lbl.replace(/^@/, ''), currentInstructionIdx);
-            labels.set(lbl.replace(/^@/, ''), currentInstructionIdx);
+            defineLabel(tokens.shift()!, currentInstructionIdx, i);
         } else if (
             tokens.length >= 3 &&
             !Number.isNaN(Number(tokens[0])) &&
@@ -293,10 +307,7 @@ export function ParseAndValidate(
         ) {
             // Line with explicit index and label: e.g. "3 @loop LOD 0 3"
             const explicitIndex = Number(tokens[0]);
-            const lbl = cleanLabel(tokens.splice(1, 1)[0]);
-            labels.set(lbl, explicitIndex);
-            labels.set('@' + lbl.replace(/^@/, ''), explicitIndex);
-            labels.set(lbl.replace(/^@/, ''), explicitIndex);
+            defineLabel(tokens.splice(1, 1)[0], explicitIndex, i);
         }
 
         let splitLine = tokens;
@@ -327,7 +338,7 @@ export function ParseAndValidate(
         }
 
         let index = Number(splitLine[0]);
-        if (Number.isNaN(index)) {
+        if (!Number.isInteger(index)) {
             parseOK = false;
             parseErrors.push({
                 rowIndex: i,
@@ -345,7 +356,7 @@ export function ParseAndValidate(
             continue;
         }
         let level = Number(splitLine[2]);
-        if (Number.isNaN(level)) {
+        if (!Number.isInteger(level)) {
             parseOK = false;
             parseErrors.push({
                 rowIndex: i,
@@ -355,6 +366,15 @@ export function ParseAndValidate(
         }
         let parameter_str = splitLine[3];
         let parameter = Number(parameter_str);
+        if (op.toUpperCase() !== 'LIT' && !Number.isNaN(parameter) && !Number.isInteger(parameter)) {
+            // Addresses, levels and operation codes are integers (only LIT may push other values)
+            parseOK = false;
+            parseErrors.push({
+                rowIndex: i,
+                error: i18next.t('core:validatorParInteger'),
+            });
+            continue;
+        }
         if (Number.isNaN(parameter)) {
             if (op.toUpperCase() === 'LIT') {
                 parameter = 0;
@@ -397,6 +417,7 @@ export function ParseAndValidate(
         pendingPreDirectives = [];
         currentInstructionIdx++;
         instructions.push(instruction);
+        instructionLines.push(i);
     }
 
     // Resolve deferred label parameters (Pass 2)
@@ -414,7 +435,7 @@ export function ParseAndValidate(
             parseOK = false;
             parseErrors.push({
                 rowIndex: deferred.rowIndex,
-                error: `Neznámé návěští / Unresolved label: ${rawLabel}`,
+                error: String(i18next.t('core:validatorUnresolvedLabel')).replace('%1', rawLabel),
             });
         }
     }
@@ -439,7 +460,7 @@ export function ParseAndValidate(
         if (instruction.index != i) {
             validationOK = false;
             validationErrors.push({
-                rowIndex: i,
+                rowIndex: instructionLines[i],
                 error: i18next.t('core:validatorBadIndex'),
             });
             continue;
@@ -448,7 +469,7 @@ export function ParseAndValidate(
         if (instruction.level < 0) {
             validationOK = false;
             validationErrors.push({
-                rowIndex: i,
+                rowIndex: instructionLines[i],
                 error: i18next.t('core:validatorNegLevel'),
             });
             continue;
@@ -457,7 +478,7 @@ export function ParseAndValidate(
         if (instruction.instruction == InstructionType.LIT && instruction.level != 0) {
             validationOK = false;
             validationErrors.push({
-                rowIndex: i,
+                rowIndex: instructionLines[i],
                 error: i18next.t('core:validatorLitLevel'),
             });
             continue;
@@ -465,14 +486,14 @@ export function ParseAndValidate(
             if (instruction.level != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorOprLevel'),
                 });
                 continue;
             } else if (instruction.parameter < 1 || instruction.parameter > 13) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorOprParam'),
                 });
                 continue;
@@ -483,7 +504,7 @@ export function ParseAndValidate(
         ) {
             validationOK = false;
             validationErrors.push({
-                rowIndex: i,
+                rowIndex: instructionLines[i],
                 error: i18next.t('core:validatorCalParam'),
             });
             continue;
@@ -491,14 +512,14 @@ export function ParseAndValidate(
             if (instruction.level != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorJmpLevel'),
                 });
                 continue;
             } else if (instruction.parameter < 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorJmpParam'),
                 });
                 continue;
@@ -507,14 +528,14 @@ export function ParseAndValidate(
             if (instruction.level != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorJmcLevel'),
                 });
                 continue;
             } else if (instruction.parameter < 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorJmcParam'),
                 });
                 continue;
@@ -525,7 +546,7 @@ export function ParseAndValidate(
         ) {
             validationOK = false;
             validationErrors.push({
-                rowIndex: i,
+                rowIndex: instructionLines[i],
                 error: i18next.t('core:validatorIntLevel'),
             });
             continue;
@@ -533,7 +554,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorRet'),
                 });
                 continue;
@@ -542,7 +563,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorRea'),
                 });
                 continue;
@@ -551,7 +572,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorWri'),
                 });
                 continue;
@@ -560,7 +581,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorNew'),
                 });
                 continue;
@@ -569,7 +590,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorDel'),
                 });
                 continue;
@@ -578,7 +599,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorLda'),
                 });
                 continue;
@@ -587,7 +608,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorSta'),
                 });
                 continue;
@@ -596,7 +617,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorPld'),
                 });
                 continue;
@@ -605,7 +626,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorPst'),
                 });
                 continue;
@@ -614,7 +635,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter != 0) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorItr'),
                 });
                 continue;
@@ -623,7 +644,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter < 0 || instruction.parameter > 1) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorRti'),
                 });
                 continue;
@@ -632,7 +653,7 @@ export function ParseAndValidate(
             if (instruction.level != 0 || instruction.parameter < 1 || instruction.parameter > 13) {
                 validationOK = false;
                 validationErrors.push({
-                    rowIndex: i,
+                    rowIndex: instructionLines[i],
                     error: i18next.t('core:validatorOpfParam'),
                 });
                 continue;

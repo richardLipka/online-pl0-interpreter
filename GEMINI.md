@@ -66,7 +66,7 @@ The simulator executes instructions against a `DataModel` CPU state:
 ### 5. Extended Instructions: Floating-Point & Interrupts
 - **`OPF 0, A`**: Floating-point operations (add, sub, mul, div, comparisons). Floating-point division and modulo by zero follow IEEE-754 hardware semantics, yielding `Infinity` or `NaN` and recording a soft warning without halting execution.
 - **`ITR 0, 0`**: Convert integer components on stack to real (floating-point) representation with mantissa and exponent.
-- **`RTI 0, 0`**: Convert real to integer representation or return from interrupt.
+- **`RTI 0, A`**: Convert real (mantissa and exponent) to integer representation: `A = 0` pushes the whole and the fractional part, `A = 1` pushes only the whole part (truncated towards zero).
 
 ### 6. Division by Zero Semantics (Hardware Realism)
 The simulator mirrors real CPU/FPU hardware execution semantics:
@@ -83,7 +83,7 @@ Directives can be placed on standalone lines or inside comments (e.g. `; &REGS`,
 - **`&ECHO <text>`**: Print custom message or marker string to output.
 - **`&MEM`**: Output memory summary (stack depth, allocated heap cells, active blocks).
 - **`&HEAP`**: Output detailed allocation table and contents of heap blocks.
-- **`&ASSERT_TOS <expected>`**: Verify that top-of-stack equals `<expected>` without popping. Fails with diagnostic error if value mismatch.
+- **`&ASSERT_TOS <expected>`**: Verify that top-of-stack equals `<expected>` without popping. A mismatch is reported as `[ASSERTION FAIL ...]` (CLI exit code 1) and execution continues.
 - **`&STATS`**: Output snapshot of instruction profiling statistics.
 
 Directives output streams directly to standard output (`model.output` in GUI and stdout in CLI) without altering calculation state.

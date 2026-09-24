@@ -1,6 +1,8 @@
 import React from 'react';
 import { Badge } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 
 export function OKView({ value }: { value: boolean }) {
-    return <Badge bg={value ? 'success' : 'danger'}>{value ? 'OK' : 'Error'}</Badge>;
+    const { t } = useTranslation();
+    return <Badge bg={value ? 'success' : 'danger'}>{value ? t('ui:badgeOK') : t('ui:badgeError')}</Badge>;
 }

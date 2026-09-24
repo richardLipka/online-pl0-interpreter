@@ -68,7 +68,7 @@ export function runHeadless(sourceCode: string, options: CliOptions = {}): CliRu
     });
     if (!parseResult.parseOK || !parseResult.validationOK) {
         let errors = [...parseResult.parseErrors, ...parseResult.validationErrors]
-            .map((e) => `Line ${e.rowIndex + 1}: ${e.error}`)
+            .map((e) => `${String(i18next.t('ui:errorLine')).replace('%1', (e.rowIndex + 1).toString())}: ${e.error}`)
             .join('; ');
 
         if (!options.ignoreLineNumbers && hasLineNumbers(sourceCode)) {

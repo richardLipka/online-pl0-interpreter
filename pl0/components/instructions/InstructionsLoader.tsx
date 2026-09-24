@@ -27,7 +27,7 @@ type InstructionsLoaderProps = {
 };
 
 export function InstructionsLoader(props: InstructionsLoaderProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [showModal, setShowModal] = useState(false);
 
     const handleClose = () => {
@@ -59,7 +59,8 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
     }, [props.forceOpen]);
 
     useEffect(() => {
-        const pav = ParseAndValidate(textInstructions.trim());
+        // Not trimmed, so that the reported line numbers match the lines in the text area
+        const pav = ParseAndValidate(textInstructions);
 
         setParseOK(pav.parseOK);
         setValidationOK(pav.validationOK);
@@ -72,7 +73,8 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
         } else {
             setInstructions(null);
         }
-    }, [textInstructions]);
+        // re-validate on language change so that the error messages get translated
+    }, [textInstructions, i18n.language]);
 
     async function handleShare() {
         const codeToShare = (textInstructions || props.initialCode || '').trim();
@@ -107,14 +109,21 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
         }
     }
 
+    function ErrorLine(props: { error: PreprocessingError }) {
+        return (
+            <code style={{ display: 'block' }}>
+                {t('ui:errorLine').replace('%1', (props.error.rowIndex + 1).toString())}:{' '}
+                {props.error.error}
+            </code>
+        );
+    }
+
     function ParseErrorsView() {
         return (
             <div>
                 {t('ui:instructionsParsingState')}: <OKView value={parseOK} />
                 {parseErrors.map((e, index) => (
-                    <code key={index} style={{ display: 'block' }}>
-                        {e.rowIndex}: {e.error}
-                    </code>
+                    <ErrorLine key={index} error={e} />
                 ))}
             </div>
         );
@@ -124,9 +133,7 @@ export function InstructionsLoader(props: InstructionsLoaderProps) {
             <div>
                 {t('ui:instructionsValidationState')}: <OKView value={validationOK} />
                 {validationErrors.map((e, index) => (
-                    <code key={index} style={{ display: 'block' }}>
-                        {e.rowIndex}: {e.error}
-                    </code>
+                    <ErrorLine key={index} error={e} />
                 ))}
             </div>
         );

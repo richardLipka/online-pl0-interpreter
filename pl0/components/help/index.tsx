@@ -225,7 +225,7 @@ export function Help() {
                                     <td><strong>NEW</strong></td>
                                     <td>0</td>
                                     <td>0</td>
-                                    <td>{renderHaltBadge(false)}</td>
+                                    <td>{renderHaltBadge(true)}</td>
                                     <td>
                                         <p>{t('ui:help_new')}</p>
                                         {renderHaltNote('ui:help_new_halt')}
@@ -341,7 +341,7 @@ export function Help() {
                             }}
                         >
                             <div>npx tsx cli/index.ts [options] &lt;file.pl0 ...&gt;</div>
-                            <div style={{ color: '#a0aec0', marginTop: '4px' }}># Options: -i &lt;input&gt; | -s &lt;max-steps&gt; | -t (--trace) | --stats | -f &lt;text|json&gt; | --lang &lt;cs|en&gt;</div>
+                            <div style={{ color: '#a0aec0', marginTop: '4px' }}># {t('ui:cliHelpOptionsLabel')}: -i &lt;input&gt; | -s &lt;max-steps&gt; | -t (--trace) | --stats | --no-debug | -n (--ignore-line-numbers) | -f &lt;text|json&gt; | --lang &lt;cs|en&gt;</div>
                         </div>
 
                         <h4 style={{ marginTop: '20px' }}>{t('ui:cliHelpDirectivesTitle')}</h4>
@@ -352,8 +352,8 @@ export function Help() {
                         <Table striped bordered hover responsive style={{ fontSize: '0.9em' }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#edf2f7' }}>
-                                    <th style={{ width: '220px' }}>Directive</th>
-                                    <th>Description</th>
+                                    <th style={{ width: '220px' }}>{t('ui:helpDirectiveColumn')}</th>
+                                    <th>{t('ui:helpDescriptionColumn')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -400,7 +400,7 @@ export function Help() {
                             </tbody>
                         </Table>
 
-                        <h5 style={{ marginTop: '16px' }}>Example PL/0 Program with Directives:</h5>
+                        <h5 style={{ marginTop: '16px' }}>{t('ui:helpDirectivesExampleTitle')}</h5>
                         <pre
                             style={{
                                 backgroundColor: '#f7fafc',
@@ -411,13 +411,13 @@ export function Help() {
                                 fontFamily: 'Consolas, Monaco, monospace',
                             }}
                         >
-{`; Compute 5! = 120 with debugging directives
+{`; ${t('ui:helpDirectivesExampleComment')}
 INT 0, 4
-LIT 0, 5 ; initial value n
+LIT 0, 5 ; ${t('ui:helpDirectivesExampleValueComment')}
 STO 0, 3
 &REGS
 &STKA
-&ECHO "Variable initialized"
+&ECHO "${t('ui:helpDirectivesExampleEcho')}"
 LOD 0, 3
 &STKN 1
 &ASSERT_TOS 5

@@ -12,11 +12,9 @@ type InstructionItemViewProps = {
     instructionsToBeHighlighted: InstructionsHighligting | null;
 };
 export function InstructionItemView(props: InstructionItemViewProps) {
-    const highlightedRow = props.isNext
-        ? props.instructionsToBeHighlighted?.rowColors.has(props.instruction.index)
-            ? props.instructionsToBeHighlighted?.rowColors.get(props.instruction.index)
-            : null
-        : null;
+    // Any row can be highlighted - e.g. the target of a jump, call or return of the next instruction
+    const highlightedRow =
+        props.instructionsToBeHighlighted?.rowColors.get(props.instruction.index) ?? null;
     const highlightedPar = props.isNext
         ? props.instructionsToBeHighlighted?.parameter ?? null
         : null;

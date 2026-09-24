@@ -21,21 +21,9 @@ export function WarningsView(props: WarningsViewProps) {
     const count = props.warnings?.length ?? 0;
     const headerTitle = `${t('ui:headerWarnings')}${count > 0 ? ` (${count})` : ''}`;
 
-    const isError = (text: string) => {
-        const lower = text.toLowerCase();
-        return (
-            lower.includes('error') ||
-            lower.includes('chyba') ||
-            lower.includes('division by zero') ||
-            lower.includes('dělení nulou') ||
-            lower.includes('jump to negative') ||
-            lower.includes('skok na zápornou') ||
-            lower.includes('empty part of memory') ||
-            lower.includes('prázdné části paměti') ||
-            lower.includes('not enough operands') ||
-            lower.includes('nedostatek operandů')
-        );
-    };
+    // Soft warnings always start with "Warning:" / "Varování:" (in either language, as the
+    // language may have been switched since); everything else is a fatal runtime error
+    const isError = (text: string) => !/^(Warning|Varování):/.test(text);
 
     const content = (
         <div

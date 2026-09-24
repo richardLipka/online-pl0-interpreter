@@ -273,12 +273,58 @@ function GetValuesFromStack(
     return retvals;
 }
 
+function StackOverflowError(stack: Stack): Error {
+    const msg = String(i18next.t('core:modelMaxStackSizeError'));
+    return new Error(msg.replace('%1', stack.maxSize.toString()));
+}
+
+// Throws a localized error when a computed stack address is negative or not an integer
+function CheckStackAddress(address: number) {
+    if (!Number.isInteger(address)) {
+        const msg = String(i18next.t('core:modelStackInvalidAddress'));
+        throw new Error(msg.replace('%1', String(address)));
+    }
+    if (address < 0) {
+        const msg = String(i18next.t('core:modelStackNegativeAddress'));
+        throw new Error(msg.replace('%1', address.toString()));
+    }
+}
+
+// A negative address (offset) reaches below the base of the target frame, e.g. LOD 0 -1 reads
+// a value the caller pushed before CAL. That is allowed, but easy to get wrong, so it is flagged.
+function WarnNegativeOffset(
+    warnings: string[],
+    key: 'core:modelStackWarnNegativeRead' | 'core:modelStackWarnNegativeWrite',
+    offset: number,
+    address: number
+) {
+    if (offset < 0) {
+        const msg = String(i18next.t(key));
+        warnings.push(msg.replace('%1', offset.toString()).replace('%2', address.toString()));
+    }
+}
+
+// Throws a localized error when a jump target is not a valid instruction index.
+// allowEnd permits jumping just past the last instruction (the program then ends).
+function CheckJumpTarget(target: number, instructionCount: number, allowEnd: boolean = false) {
+    if (target < 0) {
+        const msg = String(i18next.t('core:modelJumpNegativeAddress'));
+        throw new Error(msg.replace('%1', target.toString()));
+    }
+    const lastAllowed = allowEnd ? instructionCount : instructionCount - 1;
+    if (!Number.isInteger(target) || target > lastAllowed) {
+        const msg = String(i18next.t('core:modelJumpEmptyMemory'));
+        throw new Error(msg.replace('%1', String(target)));
+    }
+}
+
 function GetValueFromStack(stack: Stack, index: number) {
+    CheckStackAddress(index);
     if (index >= stack.stackItems.length) {
         while (stack.stackItems.length - 1 != index) {
             stack.stackItems.push({ value: 0 });
             if (stack.stackItems.length > stack.maxSize) {
-                throw new Error(i18next.t('core:modelMaxStackSizeError'));
+                throw StackOverflowError(stack);
             }
         }
         return 0;
@@ -288,18 +334,13 @@ function GetValueFromStack(stack: Stack, index: number) {
 }
 
 function PutOntoStack(stack: Stack, index: number, value: number | string) {
-    if (index >= stack.stackItems.length) {
-        while (stack.stackItems.length - 1 != index) {
-            stack.stackItems.push({ value: 0 });
-        }
+    CheckStackAddress(index);
+    if (index >= stack.maxSize) {
+        throw StackOverflowError(stack);
     }
 
-    if (index < 0) {
-        throw new Error(i18next.t('core:modelStackNegativeError'));
-    }
-
-    if (stack.stackItems.length > stack.maxSize) {
-        throw new Error(i18next.t('core:modelMaxStackSizeError'));
+    while (stack.stackItems.length - 1 < index) {
+        stack.stackItems.push({ value: 0 });
     }
 
     stack.stackItems[index].value = value;
@@ -322,11 +363,13 @@ function PushOntoStack(
     values: StackItem[],
     increment: boolean = true
 ): number {
-    let currentStackFrame: StackFrame = stack.stackFrames[stack.stackFrames.length - 1];
+    let currentStackFrame: StackFrame | undefined = stack.stackFrames[stack.stackFrames.length - 1];
     for (let i = 0; i < values.length; i++) {
         if (increment) {
             sp++;
-            currentStackFrame.size++;
+            if (currentStackFrame) {
+                currentStackFrame.size++;
+            }
         }
 
         if (sp > stack.stackItems.length - 1) {
@@ -336,7 +379,7 @@ function PushOntoStack(
     }
 
     if (!CheckStackSize(stack)) {
-        throw new Error(i18next.t('core:modelMaxStackSizeError'));
+        throw StackOverflowError(stack);
     }
 
     return sp;
@@ -360,9 +403,13 @@ function CheckSPInBounds(sp: number) {
 }
 
 function FindBase(stack: Stack, base: number, level: number): number {
+    if (!Number.isInteger(level) || level < 0) {
+        const msg = String(i18next.t('core:modelInvalidLevel'));
+        throw new Error(msg.replace('%1', String(level)));
+    }
     let newBase = base;
     while (level > 0) {
-        if (newBase < 0 || newBase >= stack.stackItems.length) {
+        if (!Number.isInteger(newBase) || newBase < 0 || newBase >= stack.stackItems.length) {
             throw new Error(i18next.t('core:modelBaseSearchError') + level + ')');
         }
         newBase = Number(stack.stackItems[newBase].value);
@@ -380,7 +427,11 @@ function FindBase(stack: Stack, base: number, level: number): number {
 // ------------------------------------------- INSTRUCTION FUNCTIONS
 
 export function DoStep(params: InstructionStepParameters): InstructionStepResult {
-    if (params.model.pc < 0 || params.model.pc >= params.instructions.length) {
+    if (
+        !Number.isInteger(params.model.pc) ||
+        params.model.pc < 0 ||
+        params.model.pc >= params.instructions.length
+    ) {
         throw new Error(i18next.t('core:modelNonExistentInstructionError'));
     }
 
@@ -461,7 +512,14 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
     switch (op) {
         case InstructionType.LIT:
             let litVal: number | string = parameter_str;
-            if (!Number.isNaN(Number(parameter_str)) && parameter_str.trim() !== '') {
+            // Numeric literals are pushed as numbers, except integers written with leading
+            // zeros (e.g. "05"), which keep their text so that ITR can use them as the
+            // fractional part of a real number (3 and 05 -> 3.05)
+            if (
+                !Number.isNaN(Number(parameter_str)) &&
+                parameter_str.trim() !== '' &&
+                !/^[+-]?0\d+$/.test(parameter_str.trim())
+            ) {
                 litVal = Number(parameter_str);
             }
             params.model.sp = PushOntoStack(
@@ -480,14 +538,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.pc++;
             break;
         case InstructionType.JMP:
-            if (parameter < 0) {
-                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
-                throw new Error(msg.replace('%1', parameter.toString()));
-            }
-            if (parameter >= params.instructions.length) {
-                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
-                throw new Error(msg.replace('%1', parameter.toString()));
-            }
+            CheckJumpTarget(parameter, params.instructions.length);
             params.model.pc = parameter;
             break;
         case InstructionType.JMC:
@@ -496,14 +547,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.sp--;
             if (operands[0] == 0) {
                 stats.conditionalJumpsTaken++;
-                if (parameter < 0) {
-                    const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
-                    throw new Error(msg.replace('%1', parameter.toString()));
-                }
-                if (parameter >= params.instructions.length) {
-                    const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
-                    throw new Error(msg.replace('%1', parameter.toString()));
-                }
+                CheckJumpTarget(parameter, params.instructions.length);
                 params.model.pc = parameter;
             } else {
                 stats.conditionalJumpsNotTaken++;
@@ -511,6 +555,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             }
             break;
         case InstructionType.CAL:
+            CheckJumpTarget(parameter, params.instructions.length);
             let newBase = FindBase(stack, params.model.base, level);
             PushOntoStack(
                 stack,
@@ -530,15 +575,6 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 ConvertToStackItems(params.model.pc + 1),
                 false
             );
-
-            if (parameter < 0) {
-                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
-                throw new Error(msg.replace('%1', parameter.toString()));
-            }
-            if (parameter >= params.instructions.length) {
-                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
-                throw new Error(msg.replace('%1', parameter.toString()));
-            }
 
             stack.stackFrames.push({ index: params.model.sp + 1, size: 0 });
 
@@ -561,27 +597,21 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             let retPc = Number(res[0]);
             let retBase = Number(res[1]);
 
+            // Returning just past the last instruction is allowed - the program then ends
+            CheckJumpTarget(retPc, params.instructions.length, true);
+            CheckStackAddress(retBase);
+
             params.model.sp = params.model.base - 1;
             params.model.pc = retPc;
             params.model.base = retBase;
             params.model.stack.stackFrames.pop();
-
-            if (retPc < 0) {
-                const msg = String(i18next.t('core:modelJumpNegativeAddress') || 'Jump to negative address %1');
-                throw new Error(msg.replace('%1', retPc.toString()));
-            }
-            if (retPc > params.instructions.length) {
-                const msg = String(i18next.t('core:modelJumpEmptyMemory') || 'Jump to empty part of memory (instruction index %1)');
-                throw new Error(msg.replace('%1', retPc.toString()));
-            }
             break;
         case InstructionType.LOD:
             var base = FindBase(stack, params.model.base, level);
             var address = base + parameter;
-            if (parameter < 0 || address < 0) {
-                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
-                warnings.push(msg.replace('%1', address.toString()));
-            } else if (address > params.model.sp) {
+            CheckStackAddress(address);
+            WarnNegativeOffset(warnings, 'core:modelStackWarnNegativeRead', parameter, address);
+            if (address > params.model.sp) {
                 const msg = String(i18next.t('core:modelStackWarnReadUnallocated') || 'Warning: Reading from unallocated stack memory at index %1 (SP is %2)');
                 warnings.push(msg.replace('%1', address.toString()).replace('%2', params.model.sp.toString()));
             }
@@ -600,10 +630,9 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             if (typeof stoVal === 'string' && !Number.isNaN(Number(stoVal)) && stoVal.trim() !== '') {
                 stoVal = Number(stoVal);
             }
-            if (parameter < 0 || address < 0) {
-                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
-                warnings.push(msg.replace('%1', address.toString()));
-            } else if (parameter === 0) {
+            CheckStackAddress(address);
+            WarnNegativeOffset(warnings, 'core:modelStackWarnNegativeWrite', parameter, address);
+            if (parameter === 0) {
                 const msg = String(i18next.t('core:modelStackWarnWriteSB') || 'Warning: Overwriting static base (SB) at stack index %1 with value %2');
                 warnings.push(msg.replace('%1', address.toString()).replace('%2', stoVal.toString()));
             } else if (parameter === 1) {
@@ -635,8 +664,9 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
 
             params.model.output += String.fromCharCode(numCode);
 
-            if (params.model.output.includes("\\n")) {
-                params.model.output = params.model.output.replace("\\n", "\n");
+            // Writing the two characters '\' and 'n' produces a line break
+            if (params.model.output.endsWith('\\n')) {
+                params.model.output = params.model.output.slice(0, -2) + '\n';
             }
 
             params.model.sp--;
@@ -647,10 +677,16 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 throw new Error(i18next.t('core:modelReadInputEmpty'));
             }
 
+            const readCode = inputString.charCodeAt(0);
+            if (readCode > 255) {
+                const msg = String(i18next.t('core:modelReadNonAscii'));
+                throw new Error(msg.replace('%1', inputString.charAt(0)).replace('%2', readCode.toString()));
+            }
+
             params.model.sp = PushOntoStack(
                 stack,
                 params.model.sp,
-                ConvertToStackItems(inputString.charCodeAt(0))
+                ConvertToStackItems(readCode)
             );
             inputString = inputString.slice(1);
             params.model.pc++;
@@ -660,7 +696,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             params.model.sp--;
             let reqSize = Number(count[0]);
 
-            if (reqSize <= 0 || reqSize > params.model.heap.size) {
+            if (!Number.isInteger(reqSize) || reqSize <= 0 || reqSize > params.model.heap.size) {
                 const msg = String(i18next.t('core:modelHeapWarnAllocFailed') || 'Warning: Heap allocation failed for requested size %1 (returned -1)');
                 warnings.push(msg.replace('%1', reqSize.toString()));
                 params.model.sp = PushOntoStack(
@@ -685,14 +721,14 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.DEL:
             var addr = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
-            params.model.pc++;
             if (Free(heap, Number(addr[0])) != 0) {
                 throw new Error(
                     i18next.t('core:modelFreeBlockNotAllocated1') +
-                    addr +
+                    addr[0] +
                     i18next.t('core:modelFreeBlockNotAllocated2')
                 );
             }
+            params.model.pc++;
             break;
         case InstructionType.LDA:
             var addr = GetValuesFromStack(stack, params.model.sp, 1);
@@ -762,10 +798,9 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var base = FindBase(stack, params.model.base, Number(values[1]));
             let pldOffset = Number(values[0]);
             let pldAddress = base + pldOffset;
-            if (pldOffset < 0 || pldAddress < 0) {
-                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
-                warnings.push(msg.replace('%1', pldAddress.toString()));
-            } else if (pldAddress > params.model.sp) {
+            CheckStackAddress(pldAddress);
+            WarnNegativeOffset(warnings, 'core:modelStackWarnNegativeRead', pldOffset, pldAddress);
+            if (pldAddress > params.model.sp) {
                 const msg = String(i18next.t('core:modelStackWarnReadUnallocated') || 'Warning: Reading from unallocated stack memory at index %1 (SP is %2)');
                 warnings.push(msg.replace('%1', pldAddress.toString()).replace('%2', params.model.sp.toString()));
             }
@@ -786,10 +821,9 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             if (typeof pstVal === 'string' && !Number.isNaN(Number(pstVal)) && pstVal.trim() !== '') {
                 pstVal = Number(pstVal);
             }
-            if (pstOffset < 0 || pstAddress < 0) {
-                const msg = String(i18next.t('core:modelStackWarnNegative') || 'Warning: Attempt to write to negative stack address %1');
-                warnings.push(msg.replace('%1', pstAddress.toString()));
-            } else if (pstOffset === 0) {
+            CheckStackAddress(pstAddress);
+            WarnNegativeOffset(warnings, 'core:modelStackWarnNegativeWrite', pstOffset, pstAddress);
+            if (pstOffset === 0) {
                 const msg = String(i18next.t('core:modelStackWarnWriteSB') || 'Warning: Overwriting static base (SB) at stack index %1 with value %2');
                 warnings.push(msg.replace('%1', pstAddress.toString()).replace('%2', pstVal.toString()));
             } else if (pstOffset === 1) {
@@ -813,20 +847,8 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var values = GetValuesFromStack(stack, params.model.sp, 2);
             params.model.sp -= 2;
 
-            whole_part = values[1].toString();
-            fractional_part = values[0].toString();
-
             /* Convert to mantissa and exponent in base 10 */
-            mantissa = Number(whole_part + fractional_part).toString();
-            exponent = -1 * Number(fractional_part.length);
-
-            while(mantissa[mantissa.length - 1] == '0') {
-                mantissa = mantissa.substring(0, mantissa.length - 1);
-                exponent++;
-            }
-            mantissa = Number(mantissa);
-
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent, 6);
+            [mantissa, exponent] = PartsToFloat(values[1], values[0]);
 
             params.model.sp = PushOntoStack(
                 stack,
@@ -839,32 +861,8 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
             var values = GetValuesFromStack(stack, params.model.sp, 2);
             params.model.sp -= 2;
 
-            mantissa = values[0].toString();
-            exponent = Number(values[1]);
-
             /* Convert to whole and fractional part */
-            whole_part = "0";
-            fractional_part = "0";
-            if (exponent > 0) {
-                whole_part = mantissa.toString();
-                while (whole_part.length < exponent + 1) {
-                    whole_part =  whole_part + '0';
-                }
-            }
-            else {
-                whole_part = mantissa.substring(0, mantissa.length + exponent);
-                if (whole_part.length == 0) {
-                    whole_part = '0';
-                    while (mantissa.length + exponent < 0) {
-                        mantissa = '0' + mantissa;
-                    }
-                }
-                fractional_part = mantissa.substring(mantissa.length + exponent, mantissa.length);
-            }
-
-            if (fractional_part.length == 0) {
-                fractional_part = '0';
-            }
+            [whole_part, fractional_part] = FloatToParts(values[0], values[1]);
 
             if (parameter == 0) {
                 params.model.sp = PushOntoStack(
@@ -874,10 +872,11 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
                 );
             }
             else if (parameter == 1) {
+                // The integer conversion truncates towards zero, so -0.5 becomes 0
                 params.model.sp = PushOntoStack(
                     stack,
                     params.model.sp,
-                    ConvertToStackItems(whole_part)
+                    ConvertToStackItems(whole_part === '-0' ? '0' : whole_part)
                 );
             }
 
@@ -932,27 +931,31 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
 }
 
 function PerformINT(stack: Stack, sp: number, count: number) {
-    let currentStackFrame: StackFrame = stack.stackFrames[stack.stackFrames.length - 1];
+    let currentStackFrame: StackFrame | undefined = stack.stackFrames[stack.stackFrames.length - 1];
     if (count >= 0) {
+        if (sp + count >= stack.maxSize) {
+            throw StackOverflowError(stack);
+        }
         sp += count;
-        currentStackFrame.size += count;
+        if (currentStackFrame) {
+            currentStackFrame.size += count;
+        }
         let toAdd = sp - stack.stackItems.length + 1;
         for (let i = 0; i < toAdd; i++) {
             stack.stackItems.push({ value: 0 });
         }
     } else {
         if (sp + count < -1) {
-            throw new Error(i18next.t('core:modelINTStackLow'));
-        } else if (sp + count < currentStackFrame.index) {
+            const msg = String(i18next.t('core:modelINTStackLow'));
+            throw new Error(msg.replace('%1', (sp + count).toString()));
+        } else if (currentStackFrame && sp + count < currentStackFrame.index) {
             throw new Error(i18next.t('core:modelINTStackFrameLow'));
         } else {
             sp += count;
-            currentStackFrame.size += count;
+            if (currentStackFrame) {
+                currentStackFrame.size += count;
+            }
         }
-    }
-
-    if (!CheckStackSize(stack)) {
-        throw new Error(i18next.t('core:modelMaxStackSizeError') + stack.maxSize + ')');
     }
 
     return sp;
@@ -963,9 +966,9 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
     let operands;
     switch (e_op) {
         case OperationType.U_MINUS:
-            let val = Number(stack.stackItems[sp].value);
-            val *= -1;
-            stack.stackItems[sp].value = val;
+            operands = GetValuesFromStack(stack, sp, 1);
+            sp -= 1;
+            sp = PushOntoStack(stack, sp, ConvertToStackItems(-Number(operands[0])));
             break;
         case OperationType.ADD:
             operands = GetValuesFromStack(stack, sp, 2);
@@ -988,10 +991,12 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             if (Number(operands[0]) == 0) {
                 throw new Error(i18next.t('core:modelDivideByZero'));
             }
+            // Integer division truncates towards zero (like C, Java and Pascal div),
+            // so that a = (a / b) * b + (a mod b) holds together with MOD below
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(Math.floor(Number(operands[1]) / Number(operands[0])))
+                ConvertToStackItems(Math.trunc(Number(operands[1]) / Number(operands[0])))
             );
             break;
         case OperationType.MOD:
@@ -1000,10 +1005,11 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             if (Number(operands[0]) == 0) {
                 throw new Error(i18next.t('core:modelDivideByZero'));
             }
+            // The remainder takes the sign of the dividend
             sp = PushOntoStack(
                 stack,
                 sp,
-                ConvertToStackItems(Math.floor(Number(operands[1]) % Number(operands[0])))
+                ConvertToStackItems(Math.trunc(Number(operands[1]) % Number(operands[0])))
             );
             break;
         case OperationType.IS_ODD:
@@ -1066,23 +1072,125 @@ function PerformOPR(stack: Stack, operation: number, sp: number): number {
             );
             break;
         default:
-            throw new Error(i18next.t('core:modelUnknownOPR') + OperationType[e_op]);
+            throw new Error(i18next.t('core:modelUnknownOPR') + operation);
     }
 
     return sp;
 }
 
-function RoundFloat(mantissa:string, exponent:number, decimals:number = 6): (number | string)[] {
-    let num = Number(mantissa);
-    if (!Number.isFinite(num)) {
-        if (Number.isNaN(num)) return ['NaN', exponent];
-        return [num > 0 ? 'Infinity' : '-Infinity', exponent];
-    }
-    var mantissa_orig_len = mantissa.length;
-    mantissa = mantissa.substring(0, decimals);
-    exponent += mantissa_orig_len - mantissa.length;
+// ------------------------------------------- FLOATING POINT UTILITY FUNCTIONS
 
-    return [Number(mantissa), exponent];
+// Real numbers are stored as two stack cells: an integer mantissa and a base-10 exponent
+// (value = mantissa * 10^exponent). Non-finite values are stored as the strings
+// 'NaN', 'Infinity' and '-Infinity' in place of the mantissa.
+
+// A finite number split into its decimal digits: value = +/- digits * 10^exponent
+interface DecimalDigits {
+    negative: boolean;
+    digits: string;
+    exponent: number;
+}
+
+// Largest decimal exponent a real number can meaningfully have (beyond it the value is not finite)
+const MAX_DECIMAL_EXPONENT = 400;
+
+function NumberToDecimalDigits(num: number): DecimalDigits {
+    const [coefficient, exponentPart] = Math.abs(num).toExponential().split('e');
+    const [intPart, fracPart = ''] = coefficient.split('.');
+    let digits = intPart + fracPart;
+    let exponent = Number(exponentPart) - fracPart.length;
+    while (digits.length > 1 && digits.endsWith('0')) {
+        digits = digits.slice(0, -1);
+        exponent++;
+    }
+    return { negative: num < 0, digits, exponent };
+}
+
+// Normalizes mantissa * 10^exponent to an integer mantissa without trailing zeros,
+// truncated to at most `decimals` significant digits
+function RoundFloat(mantissa: number, exponent: number, decimals: number = 6): [number | string, number] {
+    if (!Number.isFinite(mantissa)) {
+        return [String(mantissa), exponent];
+    }
+    if (mantissa === 0) {
+        return [0, 0];
+    }
+    const d = NumberToDecimalDigits(mantissa);
+    let digits = d.digits;
+    let newExponent = exponent + d.exponent;
+    if (digits.length > decimals) {
+        newExponent += digits.length - decimals;
+        digits = digits.substring(0, decimals);
+        while (digits.length > 1 && digits.endsWith('0')) {
+            digits = digits.slice(0, -1);
+            newExponent++;
+        }
+    }
+    const value = Number(digits);
+    return [d.negative ? -value : value, newExponent];
+}
+
+// ITR: whole part and fractional part (e.g. 3 and "05" for 3.05) -> mantissa and exponent
+function PartsToFloat(whole: number | string, fraction: number | string): [number | string, number] {
+    const wholeStr = String(whole).trim();
+    const fractionStr = String(fraction).trim();
+    const negative = wholeStr.startsWith('-');
+    const wholeDigits = wholeStr.replace(/^[+-]/, '');
+    const fractionDigits = fractionStr.replace(/^\+/, '');
+
+    if (!/^\d+$/.test(wholeDigits) || !/^\d+$/.test(fractionDigits)) {
+        return ['NaN', 0];
+    }
+
+    const mantissa = Number(wholeDigits + fractionDigits);
+    return RoundFloat(negative ? -mantissa : mantissa, -fractionDigits.length);
+}
+
+// RTI: mantissa and exponent -> whole part and fractional part as digit strings.
+// The sign is carried by the whole part, so -0.5 becomes "-0" and "5".
+function FloatToParts(mantissa: number | string, exponent: number | string): [string, string] {
+    const m = Number(mantissa);
+    const e = Number(exponent);
+    if (!Number.isFinite(m) || !Number.isInteger(e)) {
+        return [String(Number.isFinite(m) ? NaN : m), '0'];
+    }
+    if (m === 0) {
+        return ['0', '0'];
+    }
+
+    const d = NumberToDecimalDigits(m);
+    const exp = e + d.exponent;
+    let whole: string;
+    let fraction: string;
+    if (exp > MAX_DECIMAL_EXPONENT) {
+        return [d.negative ? '-Infinity' : 'Infinity', '0'];
+    } else if (exp < -MAX_DECIMAL_EXPONENT) {
+        return ['0', '0'];
+    } else if (exp >= 0) {
+        whole = d.digits + '0'.repeat(exp);
+        fraction = '0';
+    } else if (d.digits.length > -exp) {
+        whole = d.digits.slice(0, d.digits.length + exp);
+        fraction = d.digits.slice(d.digits.length + exp);
+    } else {
+        whole = '0';
+        fraction = '0'.repeat(-exp - d.digits.length) + d.digits;
+    }
+
+    fraction = fraction.replace(/0+$/, '') || '0';
+    if (d.negative) {
+        whole = '-' + whole;
+    }
+    return [whole, fraction];
+}
+
+// Tests whether mantissa * 10^exponent is an odd integer
+function IsOddFloat(mantissa: number, exponent: number): boolean {
+    if (!Number.isFinite(mantissa) || !Number.isInteger(exponent)) {
+        return false;
+    }
+    const value = exponent >= 0 ? mantissa * Math.pow(10, exponent) : mantissa / Math.pow(10, -exponent);
+    return Number.isInteger(value) && Math.abs(value) % 2 === 1;
 }
 
 function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: string[], pc?: number): number {
@@ -1102,11 +1210,13 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             sp -= 2;
 
             /* Get mantissa only and change sign */
-            mantissa = operands[0].toString();
-            if (mantissa[0] == '-') {
+            mantissa = operands[0].toString().trim();
+            if (Number.isNaN(Number(mantissa)) || Number(mantissa) === 0) {
+                mantissa = Number.isNaN(Number(mantissa)) ? 'NaN' : '0';
+            } else if (mantissa[0] == '-') {
                 mantissa = mantissa.substring(1);
             } else {
-                mantissa = '-' + mantissa;
+                mantissa = '-' + mantissa.replace(/^\+/, '');
             }
 
             sp = PushOntoStack(
@@ -1138,7 +1248,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             /* Pick the "bigger" exponent in term of absolute value */
             exponent = Math.min(exponent_1, exponent_2);
 
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent);
+            [mantissa, exponent] = RoundFloat(mantissa, exponent);
 
             sp = PushOntoStack(
                 stack,
@@ -1169,7 +1279,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             /* Pick the "bigger" exponent in term of absolute value */
             exponent = Math.min(exponent_1, exponent_2);
 
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent);
+            [mantissa, exponent] = RoundFloat(mantissa, exponent);
 
             sp = PushOntoStack(
                 stack,
@@ -1192,7 +1302,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             /* Add exponents */
             exponent = exponent_1 + exponent_2;
 
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent);
+            [mantissa, exponent] = RoundFloat(mantissa, exponent);
 
             sp = PushOntoStack(
                 stack,
@@ -1239,30 +1349,8 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
                 break;
             }
 
-            /* Divide mantissas */
-            mantissa = (mantissa_1 / mantissa_2).toString();
-            /* Subtract exponents */
-            exponent = exponent_1 - exponent_2;
-
-            /* Make mantissa an integer */
-            let dot_index = mantissa.indexOf('.');
-            if (dot_index == -1) {
-                dot_index = mantissa.length;
-            }
-
-            let whole_part = mantissa.substring(0, dot_index);
-            let fractional_part = mantissa.substring(dot_index + 1, mantissa.length);
-
-            mantissa = whole_part + fractional_part;
-            let temp_exponent = -1 * fractional_part.length;
-
-            while (mantissa[mantissa.length - 1] == '0') {
-                mantissa = mantissa.substring(0, mantissa.length - 1);
-                temp_exponent++;
-            }
-            exponent += temp_exponent;
-
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent);
+            /* Divide mantissas, subtract exponents and make the mantissa an integer again */
+            [mantissa, exponent] = RoundFloat(mantissa_1 / mantissa_2, exponent_1 - exponent_2);
 
             sp = PushOntoStack(
                 stack,
@@ -1321,7 +1409,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             mantissa = mantissa_1 % mantissa_2;
             exponent = Math.min(exponent_1, exponent_2);
 
-            [mantissa, exponent] = RoundFloat(mantissa.toString(), exponent);
+            [mantissa, exponent] = RoundFloat(mantissa, exponent);
 
             sp = PushOntoStack(
                 stack,
@@ -1337,8 +1425,8 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             mantissa = Number(operands[0]);
             exponent = Number(operands[1]);
 
-            /* Check if mantissa is odd */
-            binary_result = Math.abs(mantissa) % 2;
+            /* Check if the number itself (not just its mantissa) is odd */
+            binary_result = IsOddFloat(mantissa, exponent) ? 1 : 0;
 
             sp = PushOntoStack(
                 stack,
@@ -1510,7 +1598,7 @@ function PerformOPF(stack: Stack, operation: number, sp: number, warnings?: stri
             );
             break;
         default:
-            throw new Error(i18next.t('core:modelUnknownOPR') + OperationType[e_op]);
+            throw new Error(i18next.t('core:modelUnknownOPF') + operation);
     }
 
     return sp;

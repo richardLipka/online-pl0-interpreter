@@ -90,11 +90,44 @@ function CheckSPInBounds(sp: number) {
     }
 }
 
+function InvalidLevelMessage(level: number | string): string {
+    return String(i18next.t('core:modelInvalidLevel')).replace('%1', String(level));
+}
+
+// Placeholder that only shows a value in the message (nothing is highlighted in the GUI)
+function TextPlaceholder(placeholder: string, value: any): Placeholder {
+    return {
+        placeholder: placeholder,
+        value: value,
+        heap: [],
+        stack: [],
+        instructions: [],
+        level: false,
+        parameter: false,
+        output: false,
+        input: false,
+        highlightType: HighlightType.BOLD,
+    };
+}
+
+// Quotes a character and makes control characters visible (e.g. '\n')
+function DisplayCharacter(ch: string): string {
+    const escapes: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
+    const code = ch.charCodeAt(0);
+    if (escapes[ch]) {
+        return `'${escapes[ch]}'`;
+    }
+    if (code < 32 || code === 127) {
+        return `'\\x${code.toString(16).padStart(2, '0')}'`;
+    }
+    return `'${ch}'`;
+}
+
 function FindBaseDummy(stack: Stack, base: number, level: number): number[] {
     let newBase = base;
     let retvals = [newBase];
     while (level > 0) {
-        if (newBase < 0 || newBase >= stack.stackItems.length) {
+        if (!Number.isInteger(newBase) || newBase < 0 || newBase >= stack.stackItems.length) {
             return [-1];
         }
         newBase = Number(stack.stackItems[newBase].value);
@@ -150,6 +183,11 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             placeholders: [],
         };
     }
+
+    // Shared by several cases below, so they must be declared outside the switch
+    // (a `let` inside one case is in the temporal dead zone for the other cases)
+    let bases: number[];
+    let tmp: number | string;
 
     try {
         switch (op) {
@@ -390,7 +428,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             });
             break;
         case InstructionType.LOD:
-            let bases = FindBaseDummy(stack, params.model.base, level);
+            bases = FindBaseDummy(stack, params.model.base, level);
             if (bases[0] == -1) {
                 explanation.message = i18next.t('core:explainerLevelTooHigh');
                 break;
@@ -398,7 +436,11 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
 
             var address = bases[bases.length - 1] + parameter;
 
-            let tmp;
+            if (address < 0) {
+                explanation.message = i18next.t('core:modelStackNegativeError');
+                break;
+            }
+
             if (address > stack.stackItems.length - 1) {
                 tmp = 0;
             } else {
@@ -520,21 +562,27 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             if (Number.isNaN(wriCode) || wriCode < 0 || wriCode > 255) {
                 explanation.message = i18next.t('core:explainerWRIAsciiErr');
             } else {
-                explanation.message =
-                    i18next.t('core:explainerWRI') +
-                    String.fromCharCode(wriCode);
+                explanation.message = i18next.t('core:explainerWRI');
+                explanation.placeholders.push(
+                    TextPlaceholder('2', DisplayCharacter(String.fromCharCode(wriCode)))
+                );
             }
             break;
         case InstructionType.REA:
             if (params.input.length == 0) {
                 explanation.message = i18next.t('core:explainerREAInputEmpty');
+            } else if (params.input.charCodeAt(0) > 255) {
+                explanation.message = String(i18next.t('core:modelReadNonAscii'))
+                    .replace('%1', params.input.charAt(0))
+                    .replace('%2', params.input.charCodeAt(0).toString());
             } else {
-                explanation.message =
-                    i18next.t('core:explainerREA') +
-                    params.input.at(0) +
-                    ' (' +
-                    params.input.charCodeAt(0) +
-                    ')';
+                explanation.message = i18next.t('core:explainerREA');
+                explanation.placeholders.push(
+                    TextPlaceholder('1', DisplayCharacter(params.input.charAt(0)))
+                );
+                explanation.placeholders.push(
+                    TextPlaceholder('2', params.input.charCodeAt(0))
+                );
             }
             break;
         case InstructionType.NEW:
@@ -552,7 +600,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
                 highlightType: HighlightType.BOLD,
             });
 
-            if (count <= 0 || count > params.model.heap.size) {
+            if (!Number.isInteger(count) || count <= 0 || count > params.model.heap.size) {
                 explanation.message = i18next.t('core:explainerNEWInvalidArg');
             } else {
                 let res = AllocateDummy(heap, count);
@@ -715,20 +763,31 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             break;
         case InstructionType.PLD:
             var values = GetValuesFromStack(stack, params.model.sp, 2);
+            if (!Number.isInteger(Number(values[1])) || Number(values[1]) < 0) {
+                explanation.message = InvalidLevelMessage(values[1]);
+                break;
+            }
             bases = FindBaseDummy(stack, params.model.base, Number(values[1]));
             if (bases[0] == -1) {
                 explanation.message = i18next.t('core:explainerLevelTooHigh');
                 break;
             }
 
-            if (bases[bases.length - 1] + Number(values[0]) > stack.stackItems.length - 1) {
+            var address = bases[bases.length - 1] + Number(values[0]);
+            if (!Number.isInteger(address) || address < 0) {
+                explanation.message = i18next.t('core:modelStackNegativeError');
+                break;
+            }
+
+            if (address > stack.stackItems.length - 1) {
                 tmp = 0;
             } else {
-                tmp = stack.stackItems[bases[bases.length - 1] + Number(values[0])].value;
+                tmp = stack.stackItems[address].value;
             }
 
             explanation.message =
                 i18next.t('core:explainerLOD1') +
+                address +
                 i18next.t('core:explainerLOD2') +
                 tmp +
                 i18next.t('core:explainerLOD3');
@@ -773,11 +832,21 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
                 highlightType: HighlightType.BOLD,
             });
             break;
-        case InstructionType.PST: // TODO PST
+        case InstructionType.PST:
             var values = GetValuesFromStack(stack, params.model.sp, 3);
+            if (!Number.isInteger(Number(values[1])) || Number(values[1]) < 0) {
+                explanation.message = InvalidLevelMessage(values[1]);
+                break;
+            }
             bases = FindBaseDummy(stack, params.model.base, Number(values[1]));
             if (bases[0] == -1) {
                 explanation.message = i18next.t('core:explainerLevelTooHigh');
+                break;
+            }
+
+            var address = bases[bases.length - 1] + Number(values[0]);
+            if (!Number.isInteger(address) || address < 0) {
+                explanation.message = i18next.t('core:modelStackNegativeError');
                 break;
             }
 
@@ -1683,6 +1752,7 @@ function ExplainOPF(stack: Stack, operation: number, sp: number): Explanation {
             });
             if (sp - 1 < 0) {
                 explanation.message = i18next.t('core:modelStackNegativeError');
+                explanation.placeholders = [];
                 return explanation;
             }
             explanation.placeholders.push({

@@ -61,8 +61,11 @@ export function encodeBase64Utf8(str: string, urlSafe: boolean = true): string {
  * - Auto-detected Base64 payload
  * - Standard URL-encoding (with '+' or '%20' for spaces)
  * - Escaped newline sequences ('\\n', '\\r\\n')
+ *
+ * Pass alreadyUrlDecoded = true for values that were already decoded (e.g. by URLSearchParams);
+ * decoding them again would turn '+' into spaces and break '%' sequences.
  */
-export function decodeProgramCode(raw: string): string {
+export function decodeProgramCode(raw: string, alreadyUrlDecoded: boolean = false): string {
     if (!raw) return '';
 
     let decoded = raw.trim();
@@ -77,10 +80,12 @@ export function decodeProgramCode(raw: string): string {
     }
 
     // 2. Decode percent-encoding first if present
-    try {
-        decoded = decodeURIComponent(decoded.replace(/\+/g, ' '));
-    } catch {
-        // if percent-decode fails, continue with original
+    if (!alreadyUrlDecoded) {
+        try {
+            decoded = decodeURIComponent(decoded.replace(/\+/g, ' '));
+        } catch {
+            // if percent-decode fails, continue with original
+        }
     }
 
     // 3. Auto-detect if string is pure Base64 without spaces/newlines
@@ -206,23 +211,15 @@ export function extractProgramFromUrl(
         return null;
     }
 
-    const decodedCode = decodeProgramCode(rawCode);
+    // URLSearchParams has already decoded the values
+    const decodedCode = decodeProgramCode(rawCode, true);
     if (!decodedCode.trim()) {
         return null;
     }
 
-    let decodedInput: string | undefined = undefined;
-    if (rawInput !== null && rawInput !== undefined) {
-        try {
-            decodedInput = decodeURIComponent(rawInput.replace(/\+/g, ' '));
-        } catch {
-            decodedInput = rawInput;
-        }
-    }
-
     return {
         code: decodedCode,
-        input: decodedInput,
+        input: rawInput ?? undefined,
     };
 }
 

@@ -14,7 +14,7 @@ export type HeapCellRole = 'outOfBounds' | 'meta' | 'unallocated' | 'allocated';
  * - 'allocated' if falling into active data block
  */
 export function GetHeapCellRole(heap: Heap, address: number): HeapCellRole {
-    if (address < 0 || address >= heap.size) {
+    if (!Number.isInteger(address) || address < 0 || address >= heap.size) {
         return 'outOfBounds';
     }
 
@@ -123,6 +123,9 @@ function AllocateDoubly(heap: Heap, count: number): number {
  * @returns index of the first allocated cell or -1 if the allocation failed
  */
 export function Allocate(heap: Heap, count: number): number {
+    if (!Number.isInteger(count) || count <= 0) {
+        return -1;
+    }
     if (heap.allocatorType === AllocatorType.DOUBLY_LINKED) {
         return AllocateDoubly(heap, count);
     }
@@ -305,12 +308,25 @@ export function AllocateDummy(heap: Heap, count: number): number {
 export function FreeDummy(heap: Heap, address: number): number {
     const isDoubly = heap.allocatorType === AllocatorType.DOUBLY_LINKED;
     const metaSize = isDoubly ? 3 : 2;
-    if (address > heap.size - 1 || address < metaSize) {
+    if (!Number.isInteger(address) || address > heap.size - 1 || address < metaSize) {
         return -1;
     }
 
-    let blockSize = heap.values[address - metaSize];
-    return blockSize;
+    // Same checks as Free: the address has to be the data address of an allocated block
+    let curr = 0;
+    while (curr < heap.size - (metaSize - 1)) {
+        if (curr + metaSize === address) {
+            if (heap.values[curr + 1] === 0) {
+                return -1;
+            }
+            return Math.min(heap.values[curr], heap.size - address);
+        }
+        const bSize = heap.values[curr] + metaSize;
+        if (bSize <= 0 || !Number.isFinite(bSize)) break;
+        curr += bSize;
+    }
+
+    return -1;
 }
 
 /**
@@ -344,10 +360,10 @@ export function PutValueOnHeap(heap: Heap, address: number, value: number): numb
 }
 
 export function GetValueFromHeapDummy(heap: Heap, address: number): number | null {
-    if (address < 0 || address > heap.size - 1) {
+    const role = GetHeapCellRole(heap, address);
+    if (role === 'outOfBounds') {
         return null;
     }
-    const role = GetHeapCellRole(heap, address);
     if (role === 'unallocated') {
         return NaN;
     }
@@ -355,10 +371,10 @@ export function GetValueFromHeapDummy(heap: Heap, address: number): number | nul
 }
 
 export function PutValueOnHeapDummy(heap: Heap, address: number): number {
-    if (address < 0 || address > heap.size - 1) {
+    const role = GetHeapCellRole(heap, address);
+    if (role === 'outOfBounds') {
         return -1;
     }
-    const role = GetHeapCellRole(heap, address);
     if (role === 'unallocated') {
         return -2;
     }

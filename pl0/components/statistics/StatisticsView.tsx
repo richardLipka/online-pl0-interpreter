@@ -91,7 +91,7 @@ export function StatisticsView({ stats, hideWrapper }: StatisticsViewProps) {
             case 'WRI':
                 return t('ui:statsCategoryIO');
             default:
-                return 'Other';
+                return t('ui:statsCategoryOther');
         }
     };
 
@@ -176,7 +176,7 @@ export function StatisticsView({ stats, hideWrapper }: StatisticsViewProps) {
                         </span>
                         <span style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#2d3748' }}>
                             {stats.peakTotalMemoryOccupied}{' '}
-                            <span style={{ fontSize: '0.7em', fontWeight: 'normal', color: '#718096' }}>cells</span>
+                            <span style={{ fontSize: '0.7em', fontWeight: 'normal', color: '#718096' }}>{t('ui:statsUnitCells')}</span>
                         </span>
                     </div>
 
@@ -195,7 +195,7 @@ export function StatisticsView({ stats, hideWrapper }: StatisticsViewProps) {
                         </span>
                         <span style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#2d3748' }}>
                             {stats.peakCallStackDepth}{' '}
-                            <span style={{ fontSize: '0.7em', fontWeight: 'normal', color: '#718096' }}>frames</span>
+                            <span style={{ fontSize: '0.7em', fontWeight: 'normal', color: '#718096' }}>{t('ui:statsUnitFrames')}</span>
                         </span>
                     </div>
 
@@ -213,7 +213,7 @@ export function StatisticsView({ stats, hideWrapper }: StatisticsViewProps) {
                             {t('ui:statsBranchTakenRatio')}
                         </span>
                         <span style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#2d3748' }}>
-                            {stats.conditionalJumpsExecuted > 0 ? `${stats.branchTakenRatio}%` : 'N/A'}
+                            {stats.conditionalJumpsExecuted > 0 ? `${stats.branchTakenRatio}%` : t('ui:statsNotAvailable')}
                         </span>
                     </div>
                 </div>

@@ -46,9 +46,28 @@ const Home: NextPage = () => {
     const [version, setVersion] = useState<number>(0);
     const [explainerVersion, setExplainerVersion] = useState<number>(0);
 
-    const [inputTxt, setInputTxt] = useState<string>('');
+    const [inputTxt, setInputTxtState] = useState<string>('');
     const [output, setOutputTxt] = useState<string>('');
-    const [warnings, setWarnings] = useState<string[]>([]);
+    const [warnings, setWarningsState] = useState<string[]>([]);
+
+    // The run loop calls nextStep from a timer, so it would see stale state values;
+    // the refs always hold the current input and warnings
+    const inputRef = React.useRef<string>('');
+    const warningsRef = React.useRef<string[]>([]);
+
+    function setInputTxt(value: string) {
+        inputRef.current = value;
+        setInputTxtState(value);
+    }
+
+    function setWarnings(value: string[]) {
+        warningsRef.current = value;
+        setWarningsState(value);
+    }
+
+    function addWarnings(newWarnings: string[]) {
+        setWarnings([...warningsRef.current, ...newWarnings]);
+    }
 
     const [instructions, setInstructions] = useState<Instruction[]>([]);
     const [validationOK, setValidationOK] = useState<boolean>(false);
@@ -238,7 +257,7 @@ function cloneModel(m: DataModel): DataModel {
         return {
             model,
             instructions,
-            input: inputTxt,
+            input: inputRef.current,
         };
     }
 
@@ -247,20 +266,20 @@ function cloneModel(m: DataModel): DataModel {
             return null;
         }
 
-        setHistory((prev) => [
-            ...prev,
-            {
-                model: cloneModel(model),
-                inputTxt: inputTxt,
-                output: output,
-                warnings: [...warnings],
-            },
-        ]);
+        // The snapshot has to be taken now - the updater function below may run only after
+        // NextStep has already modified the model
+        const snapshot: HistorySnapshot = {
+            model: cloneModel(model),
+            inputTxt: inputRef.current,
+            output: model.output,
+            warnings: [...warningsRef.current],
+        };
+        setHistory((prev) => [...prev, snapshot]);
 
         let result: InstructionStepResult | null = null;
 
         try {
-            model.input = inputTxt;
+            model.input = inputRef.current;
             const pars: InstructionStepParameters | null = getNextStepParameters();
             if (!pars) {
                 return null;
@@ -280,7 +299,7 @@ function cloneModel(m: DataModel): DataModel {
             setInputTxt(stepResult.inputNextStep);
             setOutputTxt(stepResult.output);
             if (stepResult.warnings && stepResult.warnings.length > 0) {
-                setWarnings((prev) => [...prev, ...stepResult.warnings]);
+                addWarnings(stepResult.warnings);
             }
 
             explainNextInstruction();
@@ -288,8 +307,9 @@ function cloneModel(m: DataModel): DataModel {
             const errorMsg = (e as Error).message;
             if (model && model.stats) {
                 model.stats.haltedOnError = true;
+                model.stats.lastHaltError = errorMsg;
             }
-            setWarnings((prev) => [...prev, errorMsg]);
+            addWarnings([errorMsg]);
             alert(errorMsg);
             setEmulationState(EmulationState.ERROR);
             isPlayingRef.current = false;

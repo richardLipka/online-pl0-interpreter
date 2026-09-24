@@ -236,7 +236,9 @@ export function ExecuteDirective(
 
     switch (directive.type) {
         case 'REGS': {
-            let msg = `[DIRECTIVE &REGS at PC ${pc}] PC: ${pc}, BASE: ${base}, SP: ${sp}, Frames: ${stack.stackFrames.length}`;
+            // "at PC" is where the directive is placed, "PC:" is the current value of the register
+            // (they differ for a directive placed after a jump, call or return)
+            let msg = `[DIRECTIVE &REGS at PC ${pc}] PC: ${model.pc}, BASE: ${base}, SP: ${sp}, Frames: ${stack.stackFrames.length}`;
             if (base > 0 && base + 2 < stack.stackItems.length) {
                 const sb = stack.stackItems[base]?.value;
                 const db = stack.stackItems[base + 1]?.value;
@@ -386,8 +388,15 @@ export function ExecuteDirective(
             const actualStr = actualVal !== undefined ? String(actualVal) : '<empty stack>';
 
             let passed = false;
-            if (actualVal !== undefined) {
-                if (!isNaN(Number(expectedStr)) && !isNaN(Number(actualVal))) {
+            // Number('') is 0, so an empty expected value or an empty string on the stack
+            // must not be compared numerically
+            const bothNumeric =
+                expectedStr.trim() !== '' &&
+                String(actualVal).trim() !== '' &&
+                !isNaN(Number(expectedStr)) &&
+                !isNaN(Number(actualVal));
+            if (actualVal !== undefined && expectedStr !== '') {
+                if (bothNumeric) {
                     passed = Number(actualVal) === Number(expectedStr);
                 } else {
                     passed = actualStr === expectedStr;
