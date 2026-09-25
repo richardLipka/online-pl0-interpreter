@@ -2,6 +2,7 @@ import { ExplanationMessagePart } from './highlighting';
 
 import {
     Allocate,
+    EffectiveHeapAddress,
     Free,
     GetHeapCellRole,
     GetValueFromHeap,
@@ -302,6 +303,19 @@ function WarnNegativeOffset(
         const msg = String(i18next.t(key));
         warnings.push(msg.replace('%1', offset.toString()).replace('%2', address.toString()));
     }
+}
+
+// A negative heap address wraps around to the end of the heap (-1 is the last cell).
+// That is allowed, but it is usually a bug (e.g. using the -1 returned by a failed NEW), so it is flagged.
+function ResolveHeapAddress(heap: Heap, address: number, warnings: string[]): number {
+    const effective = EffectiveHeapAddress(heap, address);
+    if (effective !== address) {
+        const msg = String(i18next.t('core:modelHeapWarnNegative'));
+        warnings.push(
+            msg.replace('%1', address.toString()).replace('%2', effective.toString()).replace('%3', heap.size.toString())
+        );
+    }
+    return effective;
 }
 
 // Throws a localized error when a jump target is not a valid instruction index.
@@ -721,10 +735,11 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.DEL:
             var addr = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
-            if (Free(heap, Number(addr[0])) != 0) {
+            var delAddr = ResolveHeapAddress(heap, Number(addr[0]), warnings);
+            if (Free(heap, delAddr) != 0) {
                 throw new Error(
                     i18next.t('core:modelFreeBlockNotAllocated1') +
-                    addr[0] +
+                    (delAddr !== Number(addr[0]) ? `${delAddr} (${addr[0]})` : addr[0]) +
                     i18next.t('core:modelFreeBlockNotAllocated2')
                 );
             }
@@ -733,7 +748,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.LDA:
             var addr = GetValuesFromStack(stack, params.model.sp, 1);
             params.model.sp--;
-            var targetAddr = Number(addr[0]);
+            var targetAddr = ResolveHeapAddress(heap, Number(addr[0]), warnings);
             var ldaCellRole = GetHeapCellRole(heap, targetAddr);
             if (ldaCellRole === 'outOfBounds') {
                 throw new Error(
@@ -765,7 +780,7 @@ export function DoStep(params: InstructionStepParameters): InstructionStepResult
         case InstructionType.STA:
             var addr = GetValuesFromStack(stack, params.model.sp, 2);
             params.model.sp -= 2;
-            var targetAddr = Number(addr[1]);
+            var targetAddr = ResolveHeapAddress(heap, Number(addr[1]), warnings);
             var valueToStore = Number(addr[0]);
             var staCellRole = GetHeapCellRole(heap, targetAddr);
             if (staCellRole === 'outOfBounds') {

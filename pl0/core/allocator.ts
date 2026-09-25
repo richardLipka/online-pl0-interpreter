@@ -7,6 +7,18 @@ import { AllocatorType, Heap, HeapBlock } from './model';
 export type HeapCellRole = 'outOfBounds' | 'meta' | 'unallocated' | 'allocated';
 
 /**
+ * Heap address actually accessed for `address`: a negative address wraps around to the end of
+ * the heap like an unsigned address (-1 is the last cell, -heap.size the first one). Other
+ * addresses are returned unchanged (and may be out of bounds).
+ */
+export function EffectiveHeapAddress(heap: Heap, address: number): number {
+    if (Number.isInteger(address) && address < 0 && address >= -heap.size) {
+        return address + heap.size;
+    }
+    return address;
+}
+
+/**
  * Returns role of cell at address for checking memory access:
  * - 'outOfBounds' if outside [0, heap.size - 1]
  * - 'meta' if falling on header metadata cells of any block

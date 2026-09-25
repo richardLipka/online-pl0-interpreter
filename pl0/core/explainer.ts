@@ -9,6 +9,7 @@ import {
 } from './model';
 
 import {
+    EffectiveHeapAddress,
     FreeDummy,
     AllocateDummy,
     GetValueFromHeapDummy,
@@ -188,6 +189,16 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
     // (a `let` inside one case is in the temporal dead zone for the other cases)
     let bases: number[];
     let tmp: number | string;
+    // set when a negative heap address wraps around to the end of the heap
+    // (the cast keeps TypeScript from narrowing it to null - it is assigned in heapAddress below)
+    let heapWrap = null as { from: number; to: number } | null;
+    const heapAddress = (address: number) => {
+        const effective = EffectiveHeapAddress(heap, address);
+        if (effective !== address) {
+            heapWrap = { from: address, to: effective };
+        }
+        return effective;
+    };
 
     try {
         switch (op) {
@@ -627,7 +638,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             }
             break;
         case InstructionType.DEL:
-            var addr = Number(stack.stackItems[params.model.sp].value);
+            var addr = heapAddress(Number(stack.stackItems[params.model.sp].value));
             let res = FreeDummy(heap, addr);
 
             if (res == -1) {
@@ -677,7 +688,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
 
             break;
         case InstructionType.LDA:
-            var addr = Number(stack.stackItems[params.model.sp].value);
+            var addr = heapAddress(Number(stack.stackItems[params.model.sp].value));
             explanation.placeholders.push({
                 placeholder: '1',
                 value: addr,
@@ -713,7 +724,7 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
                 return explanation;
             }
 
-            var addr = Number(stack.stackItems[params.model.sp - 1].value);
+            var addr = heapAddress(Number(stack.stackItems[params.model.sp - 1].value));
             var val = Number(stack.stackItems[params.model.sp].value);
             var temp = PutValueOnHeapDummy(heap, addr);
 
@@ -974,6 +985,12 @@ export function ExplainInstruction(params: InstructionStepParameters): Explanati
             break;
         default:
             throw new Error(i18next.t('core:modelNonExistentInstructionError'));
+    }
+
+    if (heapWrap) {
+        explanation.message += String(i18next.t('core:explainerHeapWrap'))
+            .replace('%1', String(heapWrap.from))
+            .replace('%2', String(heapWrap.to));
     }
 
     return explanation;

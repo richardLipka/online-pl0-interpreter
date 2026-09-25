@@ -116,6 +116,8 @@ The classic instructions execute exactly like procedure `interpret` of Wirth's P
 | **`LDA`** | `0` | `0` | Yes | Pops heap address from stack and loads the stored value onto stack. Halts on invalid/out-of-bounds address. |
 | **`STA`** | `0` | `0` | Yes | Pops value and heap destination address from stack, storing value in heap cell. Halts on invalid/out-of-bounds address. |
 
+A negative heap address (`-heap size` to `-1`) wraps around to the end of the heap like an unsigned address (`-1` is the last cell) and logs a soft warning; this applies to `LDA`, `STA` and `DEL` (e.g. using the `-1` returned by a failed `NEW`). Addresses below `-heap size` or at or above the heap size halt.
+
 ---
 
 ### 3. Extended Instructions: Pointers & Indirect Addressing

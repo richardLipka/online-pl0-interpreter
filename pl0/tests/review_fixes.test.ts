@@ -183,6 +183,47 @@ describe('Review fixes', () => {
         });
     });
 
+    describe('Negative heap addresses', () => {
+        const wrapWarning = (from: number, to: number) => `Warning: Negative heap address ${from} wraps around to address ${to} (heap size 250)`;
+
+        it('LDA and STA wrap a negative address around to the end of the heap with a warning', () => {
+            const res = runProgram('LIT 0 -1\nLIT 0 7\nSTA 0 0\nLIT 0 249\nLDA 0 0\nLIT 0 -1\nLDA 0 0');
+            assert.deepStrictEqual(stackValues('LIT 0 -1\nLIT 0 7\nSTA 0 0\nLIT 0 249\nLDA 0 0\nLIT 0 -1\nLDA 0 0'), [7, 7]);
+            assert.strictEqual(res.model.heap.values[249], 7);
+            assert.strictEqual(res.warnings.filter((w) => w === wrapWarning(-1, 249)).length, 2);
+            // -heap size is the first cell
+            assert.deepStrictEqual(stackValues('LIT 0 -250\nLDA 0 0'), [248]);
+            i18next.changeLanguage('cs');
+            assert.ok(
+                runProgram('LIT 0 -1\nLDA 0 0').warnings.includes('Varování: Záporná adresa haldy -1 se přetočí na adresu 249 (velikost haldy 250)')
+            );
+        });
+
+        it('DEL wraps a negative address too; it still has to be the start of an allocated block', () => {
+            const res = runProgram('LIT 0 10\nNEW 0 0\nLIT 0 -248\nDEL 0 0');
+            assert.deepStrictEqual(res.warnings, [wrapWarning(-248, 2)]);
+            assert.strictEqual(res.model.heap.heapBlocks.length, 1);
+            assert.strictEqual(res.model.heap.heapBlocks[0].free, true);
+            assert.throws(() => runProgram('LIT 0 -1\nDEL 0 0'), /address 249 \(-1\)/);
+        });
+
+        it('addresses below -heap size are still out of bounds', () => {
+            assert.throws(() => runProgram('LIT 0 -251\nLDA 0 0'), /undefined index -251/);
+            assert.throws(() => runProgram('LIT 0 -251\nLIT 0 1\nSTA 0 0'), /undefined index -251/);
+        });
+
+        it('the explanation shows the wrapped address', () => {
+            assert.strictEqual(
+                explainAfter('LIT 0 -1\nLIT 0 7\nSTA 0 0', 2),
+                'Access on unallocated heap address 249 (the negative address -1 wraps around to 249)'
+            );
+            assert.strictEqual(
+                explainAfter('LIT 0 10\nNEW 0 0\nLIT 0 -248\nDEL 0 0', 3),
+                'Deallocates 10 heap cells from address 2 (the negative address -248 wraps around to 2)'
+            );
+        });
+    });
+
     describe('Validator', () => {
         it('rejects non-integer addresses, levels and indices but allows non-integer literals', () => {
             for (const code of ['JMP 0 1.5', 'INT 0 2.5', 'LOD 0.5 3', '0.5 LIT 0 1']) {
