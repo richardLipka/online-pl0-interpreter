@@ -42,30 +42,31 @@ export function ControlPanel(props: ControlPanelProps) {
     const currentDelay = props.stepDelay ?? 300;
 
     return (
+        // Help on the left, controls in the middle, language on the right - laid out side by side
+        // (not absolutely positioned), so that they cannot overlap on narrower windows
         <div
             style={{
                 display: 'flex',
                 flexDirection: 'row',
-                justifyContent: 'center',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 width: '100%',
-                padding: '20px',
+                gap: '12px',
+                padding: '6px 10px',
             }}
         >
             <div
                 style={{
-                    marginLeft: '10px',
                     fontSize: 'small',
-                    position: 'absolute',
-                    left: 0,
                     display: 'flex',
                     flexDirection: 'row',
+                    flexShrink: 0,
                 }}
             >
                 <Help />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', flex: '1 1 auto', minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <IconButton
                         onClick={() => props.previous()}
@@ -107,17 +108,19 @@ export function ControlPanel(props: ControlPanelProps) {
                         alignItems: 'center',
                         gap: '10px',
                         backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                        padding: '6px 14px',
+                        padding: '6px 10px',
                         borderRadius: '6px',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
                         color: '#ffffff',
                     }}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {/* icon only (the label is its tooltip), so that the header fits on one line */}
+                    <div
+                        style={{ display: 'flex', alignItems: 'center' }}
+                        title={t('ui:speedLabel')}
+                        aria-label={t('ui:speedLabel')}
+                    >
                         <FontAwesomeIcon icon={faTachometerAlt} style={{ color: '#489fb5' }} />
-                        <span style={{ fontSize: '0.85em', fontWeight: 600 }}>
-                            {t('ui:speedLabel')}:
-                        </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -134,7 +137,7 @@ export function ControlPanel(props: ControlPanelProps) {
                                 }
                             }}
                             style={{
-                                width: '110px',
+                                width: '90px',
                                 cursor: 'pointer',
                                 accentColor: '#489fb5',
                             }}
@@ -162,12 +165,11 @@ export function ControlPanel(props: ControlPanelProps) {
             {
                 <div
                     style={{
-                        marginRight: '30px',
+                        marginRight: '20px',
                         fontSize: 'small',
-                        position: 'absolute',
-                        right: 0,
                         display: 'flex',
                         flexDirection: 'row',
+                        flexShrink: 0,
                     }}
                 >
                     <Select

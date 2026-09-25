@@ -37,11 +37,41 @@ export function GetHeapCellRole(heap: Heap, address: number): HeapCellRole {
     return 'unallocated';
 }
 
+// Single-linked (implicit) list: a block knows only its own size, so a freed block cannot be
+// merged with its left neighbour. Runs of adjacent free blocks are therefore merged later,
+// when the allocator walks over them (deferred coalescing).
+
+// Data size of the block at blockAddress after merging it with all directly following free blocks
+function FreeRunDataSizeSingle(heap: Heap, blockAddress: number): number {
+    let size = heap.values[blockAddress];
+    let next = blockAddress + size + 2;
+    while (next < heap.size - 1 && heap.values[next + 1] === 0) {
+        const nextSize = heap.values[next];
+        if (!Number.isInteger(nextSize) || nextSize < 0 || next + nextSize + 2 > heap.size) break;
+        size += nextSize + 2;
+        next += nextSize + 2;
+    }
+    return size;
+}
+
+// Merges the block at blockAddress with all directly following free blocks
+function MergeFreeRunSingle(heap: Heap, blockAddress: number) {
+    const merged = FreeRunDataSizeSingle(heap, blockAddress);
+    // the headers of the absorbed blocks become (zeroed) data cells
+    for (let i = blockAddress + heap.values[blockAddress] + 2; i < blockAddress + merged + 2; i++) {
+        heap.values[i] = 0;
+    }
+    heap.values[blockAddress] = merged;
+}
+
 function AllocateSingle(heap: Heap, count: number): number {
     let blockAddress = 0;
 
     // First block has to start at 0
     while (blockAddress < heap.size - 1) {
+        if (heap.values[blockAddress + 1] === 0) {
+            MergeFreeRunSingle(heap, blockAddress);
+        }
         // If the block is free and large enough
         if (heap.values[blockAddress + 1] === 0 && heap.values[blockAddress] >= count) {
             // the block info takes up two cells, if the block is exactly count large or one larger
@@ -172,15 +202,8 @@ function FreeSingle(heap: Heap, address: number): number {
         heap.values[address + i] = 0;
     }
 
-    // Coalesce right
-    const right = address + blockSize;
-    if (right < heap.size - 1) {
-        if (heap.values[right + 1] === 0) {
-            heap.values[address - 2] += heap.values[right] + 2;
-            heap.values[right] = 0;
-            heap.values[right + 1] = 0;
-        }
-    }
+    // Coalesce right - with all directly following free blocks
+    MergeFreeRunSingle(heap, address - 2);
 
     return 0;
 }
@@ -287,10 +310,13 @@ export function AllocateDummy(heap: Heap, count: number): number {
     let blockAddress = 0;
 
     while (blockAddress < heap.size - (metaSize - 1)) {
-        if (heap.values[blockAddress + 1] === 0 && heap.values[blockAddress] >= count) {
+        const free = heap.values[blockAddress + 1] === 0;
+        // the single-linked allocator merges runs of free blocks while searching
+        const dataSize = free && !isDoubly ? FreeRunDataSizeSingle(heap, blockAddress) : heap.values[blockAddress];
+        if (free && dataSize >= count) {
             return blockAddress + metaSize;
         } else {
-            let bSize = heap.values[blockAddress] + metaSize;
+            let bSize = dataSize + metaSize;
             if (bSize <= 0 || !Number.isFinite(bSize)) break;
             blockAddress += bSize;
         }

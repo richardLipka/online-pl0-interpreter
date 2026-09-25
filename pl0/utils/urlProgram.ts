@@ -95,7 +95,7 @@ export function decodeProgramCode(raw: string, alreadyUrlDecoded: boolean = fals
             const b64Decoded = decodeBase64Utf8(decoded);
             // Heuristic check: decoded string should contain readable characters or instructions/newlines
             const hasCommonMnemonics =
-                /\b(LIT|OPR|LOD|STO|CAL|INT|JMP|JMC|RET|REA|WRI|NEW|DEL|LDA|STA|PLD|PST|ITR|RTI|OPF)\b/i.test(
+                /\b(LIT|OPR|LOD|STO|CAL|INT|JMP|JMC|JPC|RET|REA|WRI|NEW|DEL|LDA|STA|PLD|PST|ITR|RTI|OPF)\b/i.test(
                     b64Decoded
                 );
             const hasNewlines = b64Decoded.includes('\n');

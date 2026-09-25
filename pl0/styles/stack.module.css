@@ -19,7 +19,7 @@
     width: 100%;
     min-width: 100%;
     display: flex;
-    flex-direction: rowß;
+    flex-direction: row;
 }
 .stackItem {
     padding: 3px;
@@ -30,13 +30,17 @@
     padding-left: 10px;
 }
 
+/* sized by its content, so that multi-digit indices are never clipped (the column is narrow) */
 .stackRowIndex {
-    min-width: 20%;
+    flex: 0 0 auto;
+    min-width: 3ch;
+    font-size: 0.8em;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: flex-end;
-    padding-right: 10px;
+    padding-left: 4px;
+    padding-right: 4px;
 }
 .stackRowIndexSF {
     color: white;
@@ -45,5 +49,9 @@
 }
 
 .stackValue {
-    min-width: 80%;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+    overflow-wrap: break-word;
 }

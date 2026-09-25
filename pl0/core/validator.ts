@@ -25,6 +25,8 @@ export let stringInstructionMap = new Map<string, InstructionType>([
     ['INT', InstructionType.INT],
     ['JMP', InstructionType.JMP],
     ['JMC', InstructionType.JMC],
+    // name of the conditional jump in Wirth's original PL/0
+    ['JPC', InstructionType.JMC],
     ['RET', InstructionType.RET],
     ['REA', InstructionType.REA],
     ['WRI', InstructionType.WRI],
@@ -403,10 +405,15 @@ export function ParseAndValidate(
             continue;
         }
 
+        let instructionType = stringInstructionMap.get(op.toUpperCase())!;
+        if (instructionType === InstructionType.OPR && parameter === 0) {
+            // OPR 0 0 is the return instruction of Wirth's original PL/0
+            instructionType = InstructionType.RET;
+        }
+
         let instruction: Instruction = {
             index: index,
-            // @ts-ignore
-            instruction: stringInstructionMap.get(op.toUpperCase()),
+            instruction: instructionType,
             level: level,
             parameter: parameter,
             parameter_str: parameter_str,

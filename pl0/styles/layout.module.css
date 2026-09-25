@@ -2,7 +2,7 @@
     display: grid;
 
     grid:
-        [header-start] 'header header header' 60px [header-end]
+        [header-start] 'header header header' minmax(60px, auto) [header-end]
         [main-start] 'instructions stack memoryStats' 1fr [main-end]
         [footer-start] 'footer footer footer' 30px [footer-end]
         / minmax(300px, 3fr) 1fr 3fr;
